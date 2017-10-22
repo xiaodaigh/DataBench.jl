@@ -1,4 +1,4 @@
-using IndexedTables, PooledArrays, NamedTuples
+using IndexedTables, PooledArrays, NamedTuples, FastGroupBy
 import Base.ht_keyindex
 # Pkg.checkout("JuliaDB")
 # Pkg.rm("TextParse")
@@ -36,31 +36,20 @@ function run_juliadb_bench(N::Int = Int64(2e9/8), K::Int = 100)
   createIndexedTable(1,1)
 
   # create true dataset
+  #julia_timings = Dict{Symbol, Float64}()
   timegen = @elapsed DT = createIndexedTable(N, K)
-
   julia_timings = Dict(
     :gen_syn => timegen,
-    :sum1_1 => (@elapsed aggregate(+, DT, by=(:id1,), with=:v1)),
-    :sum1_2 => (@elapsed aggregate(+, DT, by=(:id1,), with=:v1)),
+    :sum1_1 => (@elapsed sumby(DT, :id1, :v1)),
+    :sum1_2 => (@elapsed sumby(DT, :id1, :v1)),
     :sum2_1 => (@elapsed aggregate(+, DT, by=(:id1,:id2), with=:v1)),
     :sum2_2 => (@elapsed aggregate(+, DT, by=(:id1,:id2), with=:v1)),
-    :sum_mean1 => (@elapsed aggregate_vec(v -> @NT(sum = sum(column(v, :v1)), mean = mean(column(v, :v3))), DT, by =(:id3,), with = (:v1, :v3))),
-    :sum_mean2 => (@elapsed aggregate_vec(v -> @NT(sum = sum(column(v, :v1)), mean = mean(column(v, :v3))), DT, by =(:id3,), with = (:v1, :v3))),
+    :sum_mean1 => (@elapsed [sumby(DT, :id3, :v1), meanby(DT,:id3, :v3)]),
+    :sum_mean2 => (@elapsed [sumby(DT, :id3, :v1), meanby(DT,:id3, :v3)]),
     :mean7_9_by_id4_1 => (@elapsed [meanby(DT, :id4, :v1), meanby(DT, :id4, :v2), meanby(DT, :id4, :v3)]),
     :mean7_9_by_id4_2 => (@elapsed [meanby(DT, :id4, :v1), meanby(DT, :id4, :v2), meanby(DT, :id4, :v3)]),
-    #res <- c(res, list(system.time( DT[, lapply(.SD, sum), keyby=id6, .SDcols=7:9] )))
-    :sum7_9_by_id6_1 => (@elapsed aggregate_vec(
-      v -> @NT(
-        sum1 = sum(column(v, :v1)),
-        sum2 = sum(column(v, :v2)),
-        sum3 = sum(column(v, :v3))
-        ), DT, by =(:id6,), with = (:v1, :v2, :v3))),
-    :sum7_9_by_id6_2 => (@elapsed aggregate_vec(
-      v -> @NT(
-        sum1 = sum(column(v, :v1)),
-        sum2 = sum(column(v, :v2)),
-        sum3 = sum(column(v, :v3))
-        ), DT, by =(:id6,), with = (:v1, :v2, :v3)))
+    :sum7_9_by_id6_1 => (@elapsed [sumby(DT, :id6, :v1), sumby(DT, :id6, :v2), sumby(DT, :id6, :v3)]),
+    :sum7_9_by_id6_2 => (@elapsed [sumby(DT, :id6, :v1), sumby(DT, :id6, :v2), sumby(DT, :id6, :v3)])
   )
 
   return julia_timings
