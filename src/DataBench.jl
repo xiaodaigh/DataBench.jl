@@ -1,10 +1,10 @@
+__precompile__(true)
 module DataBench
 
-using CSV
-
-export R_bench, createIndexedTable, run_juliadb_bench
+export R_bench, createIndexedTable, run_juliadb_bench, meanby
 
 include("julia/indexedtable.jl_bench.jl")
+include("julia/meanby.jl")
 include("julia/rbench.jl")
 #
 # function saveJuliaResult(julres, outpath = "test/results/")

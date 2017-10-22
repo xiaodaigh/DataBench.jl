@@ -26,9 +26,8 @@ gen_datatable_synthetic <- function(N=2e9/8, K=100) {
 
 #' @import
 rbench <- function(...) {
+
   library(data.table)
-  library(pipeR)
-  library(magrittr)
   timings <- list()
 
   timings$gen_syn <- system.time(DT <- gen_datatable_synthetic(...))[3]
