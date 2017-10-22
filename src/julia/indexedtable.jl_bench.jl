@@ -1,5 +1,5 @@
 using IndexedTables, PooledArrays, NamedTuples
-
+import Base.ht_keyindex
 # Pkg.checkout("JuliaDB")
 # Pkg.rm("TextParse")
 # Pkg.checkout("JuliaDB")
@@ -14,10 +14,10 @@ function createIndexedTable(N::Int,K::Int)
   pool1 = [@sprintf "id%010d" k for k in 1:(N/K)]
 
   DT = IndexedTable(
-    Columns(
+    IndexedTables.Columns(
       row_id = [1:N;]
       ),
-    Columns(
+    IndexedTables.Columns(
       id1 = randstrarray(pool, N, K),
       id2 = randstrarray(pool, N, K),
       id3 = randstrarray(pool1, N, K),
@@ -46,8 +46,8 @@ function run_juliadb_bench(N::Int = Int64(2e9/8), K::Int = 100)
     :sum2_2 => (@elapsed aggregate(+, DT, by=(:id1,:id2), with=:v1)),
     :sum_mean1 => (@elapsed aggregate_vec(v -> @NT(sum = sum(column(v, :v1)), mean = mean(column(v, :v3))), DT, by =(:id3,), with = (:v1, :v3))),
     :sum_mean2 => (@elapsed aggregate_vec(v -> @NT(sum = sum(column(v, :v1)), mean = mean(column(v, :v3))), DT, by =(:id3,), with = (:v1, :v3))),
-    :mean7_9_by_id4_1 => (@elapsed [meanby(DT, :id, :v1), meanby(DT, :id, :v2), meanby(DT, :id, :v3)]),
-    :mean7_9_by_id4_1 => (@elapsed [meanby(DT, :id, :v1), meanby(DT, :id, :v2), meanby(DT, :id, :v3)]),
+    :mean7_9_by_id4_1 => (@elapsed [meanby(DT, :id4, :v1), meanby(DT, :id4, :v2), meanby(DT, :id4, :v3)]),
+    :mean7_9_by_id4_2 => (@elapsed [meanby(DT, :id4, :v1), meanby(DT, :id4, :v2), meanby(DT, :id4, :v3)]),
     #res <- c(res, list(system.time( DT[, lapply(.SD, sum), keyby=id6, .SDcols=7:9] )))
     :sum7_9_by_id6_1 => (@elapsed aggregate_vec(
       v -> @NT(
