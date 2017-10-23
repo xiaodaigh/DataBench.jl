@@ -1,4 +1,4 @@
-using DataBench, FastGroupBy
+using DataBench, FastGroupBy, IndexedTables
 
 srand(1);
 @time DT = createIndexedTable(10_000_000, 100);
@@ -6,6 +6,7 @@ srand(1);
 using IterableTables
 @time dtdf = DataFrames.DataFrame(DT);
 @time meanby(dtdf, :id4, :v1)
+
 
 timings = Dict();
 @time res = meanby(rand(1:100,2), rand(1:100,2))

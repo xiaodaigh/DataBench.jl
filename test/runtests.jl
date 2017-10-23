@@ -15,7 +15,15 @@ c = Dict(n => b[n]/a[n][1] for n in names(a))
 
 @time b = run_juliadb_bench()
 gc()
+file1 = replace("test/results/julia $(now()).csv",":","")
+using CSV
+CSV.write(file1, b);
+
+
 @time a = R_bench(;libpath = "C:/Users/dzj/Documents/R/win-library/3.4")
+file1 = replace("test/results/r $(now()).csv",":","")
+using CSV
+CSV.write(file1, a);
 
 # compute relativities to R's data.table
 c = Dict(n => b[n]/a[n][1] for n in names(a))
@@ -25,9 +33,6 @@ c = Dict(n => b[n]/a[n][1] for n in names(a))
 abc = vcat(a, DataFrame(;b...), DataFrame(;c...))
 abc[:role] = ["R","Julia","Ratio"];
 
-file1 = replace("test/results/results $(now()).csv",":","")
-using CSV
-CSV.write(file1, abc);
 
 # files = open("test/results/"*readdir("test/results/")[2], "r")
 # abc1 = deserialize( files)

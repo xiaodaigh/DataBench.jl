@@ -5,8 +5,14 @@ import Base.ht_keyindex
 # Pkg.checkout("JuliaDB")
 # Pkg.add("JuliaDB")
 
-function randstrarray(pool, N, K)
-    PooledArray(PooledArrays.RefArray(rand(UInt8(1):UInt8(K), N)), pool)
+function randstrarray(pool, N)
+  K = length(pool)
+  PooledArray(PooledArrays.RefArray(rand(UInt8(1):UInt8(K), N)), pool)
+end
+
+function randstrarray1(pool, N)
+    K = length(pool)
+    PooledArray(PooledArrays.RefArray(rand(1:K, N)), pool)
 end
 
 function createIndexedTable(N::Int,K::Int)
@@ -18,9 +24,9 @@ function createIndexedTable(N::Int,K::Int)
       row_id = [1:N;]
       ),
     IndexedTables.Columns(
-      id1 = randstrarray(pool, N, K),
-      id2 = randstrarray(pool, N, K),
-      id3 = randstrarray(pool1, N, K),
+      id1 = randstrarray(pool, N),
+      id2 = randstrarray(pool, N),
+      id3 = randstrarray1(pool1, N),
       id4 = rand(1:K, N),                          # large groups (int)
       id5 = rand(1:K, N),                          # large groups (int)
       id6 = rand(1:(N/K), N),                        # small groups (int)
