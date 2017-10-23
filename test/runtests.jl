@@ -14,6 +14,7 @@ c = Dict(n => b[n]/a[n][1] for n in names(a))
 @test length(c) == 11
 
 @time b = run_juliadb_bench()
+gc()
 @time a = R_bench(;libpath = "C:/Users/dzj/Documents/R/win-library/3.4")
 
 # compute relativities to R's data.table
