@@ -1,25 +1,16 @@
 #addprocs()
-
-# too slow
-
-function sumby_pmap{T,S}(by::Vector{T}, val::Vector{S})
-  if nprocs() == 1
-    throw(ErrorException("only one proc"))
-  end
-  l = length(by)
-  bys = SharedArray{T}(by)
-  vals = SharedArray{S}(val)
-  sss = Int64(round(l/nprocs()))
-  index = sort(collect(Set([0:sss:l...,l])))
-
-  index2 = [(index[i-1]+1):index[i] for i in 2:length(index)]
-
-  res = pmap(index2) do ii
-    sumby(bys[ii], vals[ii])
-  end
-  return res
-end
-
+using FastGroupBy
 @everywhere using FastGroupBy
-@time sumby_pmap(id6, v1) #36
-@time sumby_pmap(id6, v1) #32
+@everywhere using SplitApplyCombine
+@time as = SharedArray(id6);
+@time bs = SharedArray(v1);
+
+@time pgroupreduce(x -> x[1], x->x[2], (x,y)-> x+y, dict_add_reduce, as, bs); #29
+@time psumby(id6, v1); #26
+
+
+@time res = pgroupreduce(x -> x[1], x->(x[2],1), (x,y)-> (x[1]+y[1], x[2]+y[2]), vcat, as, bs); #29
+
+
+
+@time res = pgroupreduce(x -> x[1], x->(x[2],1), (x,y)-> (x[1]+y[1], x[2]+y[2]), dict_mean_reduce, as, bs); #29

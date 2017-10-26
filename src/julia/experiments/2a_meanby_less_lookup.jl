@@ -1,41 +1,41 @@
-function meanby{S,T}(id4::Vector{T}, v1::Vector{S})::Dict{T,Real}
-  l = length(id4)
-  l == length(v1) || throw(DimensionMismatch())
-  res = Dict{T, Tuple{S, Int64}}()
-  szero = zero(S)
+import Base.ht_keyindex
 
-  tmp_val = v1[1]
-  tmp_count = 1
+# was thinking maybe if i dont try to hash everytime then it will be faster
+# but it's now
+
+function sumby_contig{S,T}(by::Vector{T}, val::Vector{S})
+  l = length(by)
+  l == length(val) || throw(DimensionMismatch())
+  res = Dict{T, S}()
+
+  @inbounds tmp_val = val[1]
+  @inbounds last_id = by[1]
 
   for i in 2:l
-    last_id = id4[i-1]
-    id, val = id4[i], v1[i]
-    if id == last_id
-      tmp_val += v1[i]
-      tmp_count += 1
+    @inbounds id = by[i]
+    if id == last_id # keep adding if the value is the same
+      @inbounds tmp_val += val[i]
     else
       index = ht_keyindex(res, last_id)
       if index > 0
-        @inbounds vw = res.vals[index]
-        new_vw = (vw[1] + tmp_val, vw[2] + tmp_count)
-        @inbounds res.vals[index] = new_vw
+        @inbounds res.vals[index] += tmp_val
       else
-        @inbounds res[last_id] = (tmp_val, tmp_count)
+        @inbounds res[last_id] = tmp_val
       end
-      @inbounds tmp_val = v1[i]
-      tmp_count = 1
+      @inbounds tmp_val = val[i]
+      last_id = id
     end
   end
 
-  id = id4[l]
+  id = by[l]
   index = ht_keyindex(res, id)
   if index > 0
-    @inbounds vw = res.vals[index]
-    new_vw = (vw[1] + tmp_val, vw[2] + 1)
-    @inbounds res.vals[index] = new_vw
+    @inbounds res.vals[index] += tmp_val
   else
-    @inbounds res[id] = (v1[l], 1)
+    @inbounds res[id] = val[l]
   end
 
-  return Dict(k => res[k][1]/res[k][2] for k in keys(res))
+  return Dict(k => res[k] for k in keys(res))
 end
+
+@time sumby_contig(id6, v1);

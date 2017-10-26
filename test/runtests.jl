@@ -1,24 +1,34 @@
 using FastGroupBy, DataBench
 using Base.Test
 import DataFrames.DataFrame
-using SAC
-
+using SplitApplyCombine
+@time addprocs(4)
+@time @everywhere using FastGroupBy
 #using DataFrames, CSV
 #import Base.ht_keyindex
 # write your own tests here
 
 @time b = run_juliadb_bench(1_000_000, 100)
-@time a = R_bench(1_000_000, 100; libpath = "C:/Users/dzj/Documents/R/win-library/3.4")
-c = Dict(n => b[n]/a[n][1] for n in names(a))
+@time b1 = run_juliadb_bench_pmap(1_000_000, 100)
+# @time a = R_bench(1_000_000, 100; libpath = "C:/Users/dzj/Documents/R/win-library/3.4")
+# c = Dict(n => b[n]/a[n][1] for n in names(a))
+#
+# @test length(c) == 11
 
-@test length(c) == 11
+@time b1 = run_juliadb_bench_pmap()
+gc()
+file1 = replace("test/results/julia_pmap $(now()).csv",":","")
+using CSV
+CSV.write(file1, DataFrame(;b1...));
 
 @time b = run_juliadb_bench()
 gc()
 file1 = replace("test/results/julia $(now()).csv",":","")
 using CSV
-CSV.write(file1, b);
+CSV.write(file1, DataFrame(;b...));
 
+rd = readdir("test/results/")
+substr(rd,1,1)
 
 @time a = R_bench(;libpath = "C:/Users/dzj/Documents/R/win-library/3.4")
 file1 = replace("test/results/r $(now()).csv",":","")
