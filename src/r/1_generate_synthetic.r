@@ -45,6 +45,7 @@ rbench <- function(...) {
   as.data.table(timings)
 }
 
+
 # r_syn_gen_test <- function() {
 #   res <- NULL
 #   DT <- NULL

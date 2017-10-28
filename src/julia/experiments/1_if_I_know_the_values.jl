@@ -1,10 +1,12 @@
-function sumby_oracle_id6{T, S}(by::Vector{T}, val::Vector{S})
-  szero = zero(S)
-  res = [szero for i in 1:Int64(round(N/K))]
+import IterTools.filter
+
+function sumby_intrange{T<:Integer, S}(by::Vector{T}, val::Vector{S}, bylow::T, byhigh::T)
+  lby = byhigh - bylow + 1
+  res = zeros(T, lby)
 
   for (byi,vali) in zip(by, val)
-    @inbounds res[byi] += vali
+    @inbounds res[(byi-bylow) + 1] += vali
   end
-  return res
+  IterTools.filter(x -> x[2] != 0, zip(bylow:byhigh,res))
 end
-@elapsed sumby_oracle_id6(id6, v1) # 7.06
+@time res = sumby_intrange(id6, v1, 1, 2_500_000); #7 seconds

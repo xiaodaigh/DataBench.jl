@@ -27,7 +27,7 @@ function sumby_contig{S,T}(by::Vector{T}, val::Vector{S})
     end
   end
 
-  id = by[l]
+  @inbounds id = by[l]
   index = ht_keyindex(res, id)
   if index > 0
     @inbounds res.vals[index] += tmp_val
@@ -38,4 +38,8 @@ function sumby_contig{S,T}(by::Vector{T}, val::Vector{S})
   return Dict(k => res[k] for k in keys(res))
 end
 
+two_groups = rand(1:2,N)
+@time sumby_contig(two_groups, v1); # 36 seconds so only marginally better
+@time sumby_contig(two_groups, v1) #
+@time sumby(two_groups,v1)
 @time sumby_contig(id6, v1);
