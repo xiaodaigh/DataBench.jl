@@ -1,6 +1,3 @@
-using RCall
-# R_bench(100*100, 100; libpath = "C:/Users/dzj/Documents/R/win-library/3.4")
-# R_bench(; libpath = "C:/Users/dzj/Documents/R/win-library/3.4")
 function R_bench(N=2e9/8,K = 100; libpath = "")
   R"""
   if ($libpath != "") {

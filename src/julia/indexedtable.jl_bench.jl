@@ -1,9 +1,3 @@
-using IndexedTables, PooledArrays, NamedTuples, FastGroupBy, SplitApplyCombine
-import Base.ht_keyindex
-# Pkg.checkout("JuliaDB")
-# Pkg.rm("TextParse")
-# Pkg.checkout("JuliaDB")
-# Pkg.add("JuliaDB")
 
 function randstrarray(pool, N)
   K = length(pool)

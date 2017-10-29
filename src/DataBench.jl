@@ -1,4 +1,8 @@
+__precompile__(true)
 module DataBench
+using IndexedTables, PooledArrays, NamedTuples, RCall, JuliaDB
+import Base.ht_keyindex
+using FastGroupBy, SplitApplyCombine
 
 export R_bench, createIndexedTable, run_juliadb_bench, run_juliadb_bench_pmap
 
