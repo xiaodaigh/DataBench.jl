@@ -1,0 +1,25 @@
+include("0_setup.jl")
+
+# if !isdefined(:lc)
+#     @time lc = Feather.read(lc_feather_path); #90 seconds #110
+# end;
+#
+# names(lc)
+# size(lc)
+# showcols(lc)
+#
+# @time la = eval.(parse.(lc[:loan_amnt]))
+# typeof(la)
+#
+# a = countmap(lc[:acc_now_delinq])
+# key = [k for k in keys(a)]
+# val = [a[k] for k = keys(a)]
+# DataFrame(key = key, val = val)
+
+using JuliaDB
+addprocs()
+@everywhere using JuliaDB, Dagger
+
+# about 3mins loading from csvs
+@time data = loadfiles("C:/Users/dzj/Downloads/Lending Club/csv/in one place", escapechar='"',usecache=false);
+@time save(data, "lc_juliadb")
