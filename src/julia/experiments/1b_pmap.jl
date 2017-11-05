@@ -1,8 +1,11 @@
-@time addprocs()
 @time using FastGroupBy
+@time sumby(id6,v1)
+@time addprocs()
+
 @everywhere using FastGroupBy
 @everywhere using SplitApplyCombine
 @time psumby(id6,v1)
+
 
 @time as = SharedArray(id6);
 @time bs = SharedArray(v1);

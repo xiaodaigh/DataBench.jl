@@ -1,0 +1,71 @@
+using FastGroupBy
+addprocs()
+@everywhere using FastGroupBy
+@everywhere import Base.ht_keyindex2
+@everywhere import Base._setindex!
+
+function sumby_worker{T,S<:Number}(c::Channel{Tuple{T,S, Bool}}, dict::Channel{Dict{T,S}})
+  res = Dict{T, S}()
+  # resize the Dict to a larger size
+  (byi, vali, finish) = take!(c)
+  while !finish
+    index = ht_keyindex2(res, byi)
+    if index > 0
+      #@inbounds  res.vals[index] += vali
+      res.age += 1
+      @inbounds res.keys[index] = byi
+      @inbounds res.vals[index] += vali
+    else
+      # @inbounds res[byi] = vali
+      @inbounds _setindex!(res, vali, byi, -index)
+    end
+    (byi, vali, finish) = take!(c)
+  end
+  put!(dict, res)
+end
+
+function sumby_channel{T,S<:Number}(by::AbstractVector{T}, val::AbstractVector{S})
+  i = 1
+  nw = nworkers()
+  ca = Vector{Channel{Tuple{T,S, Bool}}}(nw)
+  cres = Vector{Channel{Dict{T,S}}}(nw)
+  cresdict = Vector{Dict{T,S}}(nw)
+
+  for i in 1:nw
+    ca[i] = Channel{Tuple{T,S,Bool}}(nw)
+    cres[i] = Channel{Dict{T,S}}(0)
+    @schedule sumby_worker(ca[i], cres[i])
+  end
+
+  i = 1
+  for (byi, vali) in zip(by, val)
+    if i == nw + 1
+      i = 1
+    end
+    put!(ca[i], (byi, vali, false))
+    i += 1
+  end
+
+  for i in 1:nw
+    put!(ca[i], (zero(T) ,zero(S), true))
+  end
+
+  for i in 1:nw
+    cresdict[i] = take!(cres[i])
+  end
+  cresdict
+end
+
+@time sumby_channel(id6, v1)
+
+nw = nworkers()
+T = Int64
+S = Int64
+ca = Channel{Tuple{T,S, Bool}}(0)
+cres = Channel{Dict{T,S}}(0)
+task = @schedule sumby_worker(ca, cres)
+
+put!(ca, (1, 1, true))
+
+isready(cres)
+take!(cres)
