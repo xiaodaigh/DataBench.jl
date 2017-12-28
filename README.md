@@ -18,3 +18,6 @@ Uses [GE Flight Quest data](https://www.kaggle.com/c/flight/data), the largest t
 
 # Companion post
 [Speed of data manipulations in Julia vs R](https://www.codementor.io/zhuojiadai/speed-of-data-manipulation-in-julia-vs-r-cd7praapv)
+
+# Similar repos
+https://github.com/szilard/benchm-databases
