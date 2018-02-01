@@ -13,6 +13,9 @@ df_fix = df1[df1[:strlentype] .== "fixed",:]
 unstack(df_var, [:n, :strlen],:test,:elapsed)
 unstack(df_fix, [:n, :strlen],:test,:elapsed)
 
+df_id = df1[df1[:strlentype] .== "id",:]
+unstack(df_id, [:n, :strlen],:test,:elapsed)
+
 
 # find the winnder of fixed length string
 function findwinnerstrsort(df1)
@@ -37,3 +40,4 @@ end
 
 findwinnerstrsort(df_var)
 findwinnerstrsort(df_fix)
+findwinnerstrsort(df_id)

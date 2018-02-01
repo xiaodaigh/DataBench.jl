@@ -1,21 +1,6 @@
 using StatsBase, RCall, Query, DataFrames, DataFramesMeta, Distributions, PooledArrays, DataTables, IndexedTables
 
-function createDataFrame(N::Int,K::Int)
-  pool = [@sprintf "id%03d" k for k in 1:K]
-  pool1 = [@sprintf "id%010d" k for k in 1:(N/K)]
 
-  df = DataFrame(id1 = sample(pool,N),
-                 id2 = sample(pool,N),
-                 id3 = sample(pool1,N),
-                 id4 = sample(1:K,N),
-                 id5 = sample(1:K,N),
-                 id6 = sample(1:(N/K),N),
-                 v1 = sample(1:5,N),
-                 v2 = sample(1:5,N),
-                 v3 = sample(rand(round.(rand(Uniform(0,100),100),4), N)))
-
-  return df
-end
 
 function createDataTable(N::Int,K::Int)
   pool = [@sprintf "id%03d" k for k in 1:K]

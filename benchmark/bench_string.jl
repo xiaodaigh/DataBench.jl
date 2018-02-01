@@ -15,6 +15,12 @@ function bench_gen_string_vec_fixed_len(n, strlen, skipbase = n >= 100_000_000)
     bench_string_vec(x, n, strlen, "fixed", skipbase)
 end
 
+function bench_gen_string_vec_id_len(n, strlen, grps, skipbase = n >= 100_000_000)
+    x = DataBench.gen_string_vec_id_fixed_len(n, strlen, grps)
+    bench_string_vec(x, n, strlen, "id", skipbase)
+end
+
+
 function bench_string_vec(x, n, strlen, strlentype, skipbase = n >= 100_000_000)
     if !skipbase
         copyx = copy(x);
@@ -78,29 +84,40 @@ end
 # bench_gen_string_vec_fixed_len(1_000_000, 16)
 # bench_gen_string_vec_fixed_len(1_000_000, 24)
 # bench_gen_string_vec_fixed_len(1_000_000, 32)
-
-ns = Int.(10.^(6:8))
-strlens = 8.*(1:8)
-
 function withrepeat(x,y)
     [repeat(x, inner=[size(y,1)]) repeat(y, outer=[size(x,1)])]
 end
 
+
+ns = Int.(10.^(6:8))
+strlens = [3, 10]
 nsx = withrepeat(ns, strlens)
 
-first = true
+for i in 1:size(nsx,1)
+    n = nsx[i,1]
+    strlen = nsx[i,2]
+    df = bench_gen_string_vec_id_len(n, 3, 100)
+    println(df)
+    CSV.write("benchmark/bench_string_results/string_sort_perf $(replace(string(now()),":"," ")).csv", df);
+    df = bench_gen_string_vec_id_len(n, 10, n÷100)
+    println(df)
+    CSV.write("benchmark/bench_string_results/string_sort_perf $(replace(string(now()),":"," ")).csv", df);
+end
+
+
+ns = Int.(10.^(8:-1:6))
+strlens = 8.*(8:-1:1)
+nsx = withrepeat(ns, strlens)
 df = DataFrame()
 for i in 1:size(nsx,1)
     n = nsx[i,1]
     strlen = nsx[i,2]
     df = bench_gen_string_vec_var_len(n, strlen)
     CSV.write("benchmark/bench_string_results/string_sort_perf $(replace(string(now()),":"," ")).csv", df);
-    print(df)
+    println(df)
     df = bench_gen_string_vec_fixed_len(n, strlen)
-    print(df)
+    println(df)
+   
     CSV.write("benchmark/bench_string_results/string_sort_perf $(replace(string(now()),":"," ")).csv", df);
 end
 
-
-# save the results
-# CSV.write("benchmark/bench_string_results/string_sort_perf $(replace(string(now()),":"," ")).csv", df);

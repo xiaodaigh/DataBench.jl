@@ -12,3 +12,13 @@ deps/deps.jl
 \.RDataTmp
 
 *.rds
+
+*.csv
+
+*.png
+
+*.jld2
+
+*.feather
+
+*.txt
