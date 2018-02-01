@@ -1,6 +1,0 @@
-test,elapsed,n,strlen,strlentype,grps
-julia_sort_elapsed,0.473195108,1000000,8,fixed,10000
-julia_lsd_radixsort_elapsed,0.105694873,1000000,8,fixed,10000
-r_radixsort_elapsed,0.22000000000000242,1000000,8,fixed,10000
-c_qsort_strcmp_elapsed,0.23842584,1000000,8,fixed,10000
-three_way_radix_qsort_elapsed,0.166386233,1000000,8,fixed,10000
