@@ -22,3 +22,9 @@ deps/deps.jl
 *.feather
 
 *.txt
+
+*.jld
+
+*.fst
+
+*.df
