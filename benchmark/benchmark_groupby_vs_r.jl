@@ -1,58 +1,135 @@
+################################################################################
+# setup
+################################################################################
 using Revise
 using DataBench, FastGroupBy, ShortStrings, CategoricalArrays, uCSV,
-    SortingAlgorithms, Feather, BenchmarkTools, CSV, TextParse, FileIO
-using IterableTables, JuliaDB, IndexedTables
+    SortingAlgorithms, Feather, BenchmarkTools, CSV, TextParse, FileIO, 
+    IterableTables, JuliaDB, IndexedTables, Feather, DataFrames
 
 srand(1);
-const N = 1_000_000; const K = 100
-@time df = createSynDataFrame(N, K); #31 #40
+const N = 100_000_000; const K = 100
 
+df = DataFrame()
+if isfile("df$(N÷1_000_000)m.feather") 
+    @time df = Feather.read("df$(N÷1_000_000)m.feather")
+else
+    @time df = createSynDataFrame(N, K); #31 #40
+    @time Feather.write("df$(N÷1_000_000)m.feather", df) # save for future use
+end
 
-@time df = 
+################################################################################
+# DT[, sum(v1), keyby=id1]
+# short string & string
+################################################################################
 # test String15
 @time df[:id1_ss] = ShortString7.(df[:id1]);
 @time fastby(sum, df[:id1_ss], df[:v1]);
 @time fastby(sum, df[:id1], df[:v1]);
 
+
+################################################################################
+# DT[, sum(v1), keyby=id1]
 # test categorical
+################################################################################
 @time df[:id1_cate] = categorical(df[:id1]); #7
 @time df[:id1_cate] = compress(df[:id1_cate]); # 0.5
 @time sumby(df[:id1_cate], df[:v1]);
 @time fastby(sum, df[:id1_cate], df[:v1]);
-
-@time fgroupreduce(+, (df[:id1_cate], df[:id1_cate]), df[:v1]);
 @time fgroupreduce(+, df[:id1_cate], df[:v1]);
 
-@time df[:id3_cate] = categorical(df[:id3]) |> compress
 
-@time fastby(sum, df[:id3_cate], df[:v1]);
+################################################################################
+# DT[, sum(v1), keyby="id1,id2"]
+# test categorical
+################################################################################
+@time df[:id2_cate] = categorical(df[:id2]); #7
+@time df[:id2_cate] = compress(df[:id2_cate]); # 0.5
+@time fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1]);
 
-@benchmark fgroupreduce(+, $df[:id3_cate], $df[:v1]) evals=1 samples=5 seconds=120
+################################################################################
+# DT[, list(sum(v1),mean(v3)), keyby=id3]
+# test categorical
+################################################################################
+@time df[:id3_cate] = categorical(df[:id3]) |> compress;
+# @time fastby(sum, df[:id3_cate], df[:v1]);
+# @time fastby(sum, df[:id3_cate], df[:v1]);
+@time a = fastby([sum, mean], df[:id3_cate], (df[:v1], df[:v3]));
 
-@time Feather.write("df.feather", df)
-@time df = Feather.read("df.feather")
+# using RCall
 
-@time save(File(format"JLD","df.jld"), "df", df)))
+# R"""
+# memory.limit(2^31-1)
+# library(data.table)
+# df = feather::read_feather("df100m.feather")
+# setDT(df)
+# names(df)
+# # system.time(df[, list(sum(v1),mean(v3)), keyby=id3])
+# """
+
+# R"""
+# names(df)
+# """
 
 
-@time dfit = table(df)
+if false
+    import FastGroupBy: fastby
+    byvec =  df[:id3_cate]
+    refs = byvec.refs
+    s = SortingLab.fsortperm(byvec.refs)
 
-@time JuliaDB.save(dfit,"d:/dataabc")
+    val = df[s,:v1]
+    val2 = df[s,:v3]
+    byvec = refs[s]
+    valvec = tuple(val, val2)
+    fns = [sum, mean]
 
-using CSV
+    valvec = val
+    fn = sum
+end
 
-refs = df[:id3_cate].refs
+using JLD
+JLD.save("df100m.jld","df", df) #ERROR: StackOverflowError:
 
-extrema(refs)
-#DT[, sum(v1), keyby=id1]
-# system.time( DT[, sum(v1), keyby="id1,id2"] )
+################################################################################
+# DT[, lapply(.SD, mean), keyby=id4, .SDcols=7:9]
+################################################################################
+import FastGroupBy: BaseRadixSortSafeTypes, fastby
+using Base.Threads
+df[:id6] = Int32.( df[:id6])
 
-# system.time( DT[, list(sum(v1),mean(v3)), keyby=id3] )
 
-# system.time( DT[, lapply(.SD, mean), keyby=id4, .SDcols=7:9] )
+@time a = fastby(sum, df[:id4], (df[:v1], df[:v2], df[:v3]));
+@time a = fastby(sum, df[:id6], (df[:v1], df[:v2], df[:v3]));
 
-# system.time( DT[, lapply(.SD, sum), keyby=id6, .SDcols=7:9] )
 
+function fastby2(fn::Function, byvec::AbstractVector{T}, valvec::NTuple{3, AbstractVector}) where T <: BaseRadixSortSafeTypes
+    vs1 = valvec[1]
+    FastGroupBy.grouptwo!(byvec, vs1)
+    FastGroupBy._contiguousby_vec(sum, byvec, vs1)
+end
+
+@time fastby2(sum, df[:id4], (df[:v1], df[:v2], df[:v3]))
+@time fastby2(sum, df[:id6], (df[:v1], df[:v2], df[:v3]))
+
+using SortingAlgorithms
+df1=df[[:id4,:v1,:v2,:v3]]
+@time sort!(df1, cols=:id4, alg=RadixSort)
+
+if false
+    df[:id6] = Int32.(df[:id6])
+    byvec = df[:id6]
+    valvec = df[:v2]
+
+    @time s = SortingLab.fsortperm(byvec);
+    @time valvec[s];
+    @time sort(byvec)
+
+    valvec = (df[:v1], df[:v2], df[:v3])
+end
+
+################################################################################
+# plotting of results
+################################################################################
 using Distributions, StatPlots, Plots
 
 plot(

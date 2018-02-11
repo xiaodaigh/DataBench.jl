@@ -1,17 +1,19 @@
-using Revise, RCall
-# using DataBench
+################################################################################
+# setup
+################################################################################
+using Revise, RCall, Plots, StatPlots
+# using DataBenchs
 using uCSV, Feather, BenchmarkTools, CSV, TextParse, FileIO, JLD, IterableTables, JuliaDB, IndexedTables, uCSV, JLD2, DataFrames
+outpath = "d:/tmp/"
 
 srand(1);
 N = 100;  K = 100;
 # @time df = DataBench.createSynDataFrame(N, K); #31 #40
-
-outpath = "d:/tmp/"
 pool = "id".*dec.(1:K,3);
 pool1 = "id".*dec.(1:N÷K,10);
 nums = round.(rand(100).*100, 4);
 
-function bench_df_write(N,K, outpath)
+function bench_df_write_read(N,K, outpath, exclslow = true)
     df = DataFrame(
         id1 = rand(pool,N),
         id2 = rand(pool,N),
@@ -23,68 +25,148 @@ function bench_df_write(N,K, outpath)
         v2 = rand(1:5,N),
         v3 = rand(nums,N));
 
-    dfit = table(df)
-
-    @time res = [
-        @benchmark(Feather.write(outpath*"df.feather", $df)) , # 138
-        @benchmark(CSV.write(outpath*"df.csv", $df)), #569.749011
-        @benchmark(FileIO.save(outpath*"df_fileio.csv", $df)), # 209.438193 seconds (1.20 G allocations: 47.704 GiB, 5.91% gc time)
-        @benchmark(uCSV.write(outpath*"df_u.csv", $df)), #528.785193 seconds (3.60 G allocations: 157.952 GiB, 8.43% gc time)
-        @benchmark(FileIO.save(outpath*"df.jld","df", $df)), #215.839709 seconds (1.16 k allocations: 6.706 GiB, 2.50% gc time)
-        @benchmark(JLD2.@save(outpath*"df.jld2", $df)), #765.809597 seconds (2.70 G allocations: 58.094 GiB, 19.22% gc time)
-        @benchmark(JuliaDB.save($dfit,outpath*randstring(8)))
-    ]
-    res
+    if exclslow
+        writeres = [
+            @benchmark(Feather.write(outpath*"df.feather", $df)), # 138
+            # @benchmark(CSV.write(outpath*"df.csv", $df)), #569.749011
+            @benchmark(FileIO.save(outpath*"df_fileio.csv", $df)), # 209.438193 seconds (1.20 G allocations: 47.704 GiB, 5.91% gc time)
+            # @benchmark(uCSV.write(outpath*"df_u.csv", $df)), #528.785193 seconds (3.60 G allocations: 157.952 GiB, 8.43% gc time)
+            @benchmark(FileIO.save(outpath*"df.jld","df", $df)) #215.839709 seconds (1.16 k allocations: 6.706 GiB, 2.50% gc time)
+            # @benchmark(JLD2.@save(outpath*"df.jld2", $df)), #765.809597 seconds (2.70 G allocations: 58.094 GiB, 19.22% gc time)
+            #,@benchmark(JuliaDB.save($dfit,outpath*randstring(8)))
+            ]
+        readres = [
+            @benchmark(Feather.read(outpath*"df.feather"))
+            ,@benchmark(DataFrame(FileIO.load(outpath*"df_fileio.csv")))
+            ,@benchmark(FileIO.load(outpath*"df.jld"))
+        ]
+        return (writeres, readres)
+    else
+        dfit = table(df)
+        @time return [
+            @benchmark(Feather.write(outpath*"df.feather", $df)) , # 138
+            @benchmark(CSV.write(outpath*"df.csv", $df)), #569.749011
+            @benchmark(FileIO.save(outpath*"df_fileio.csv", $df)), # 209.438193 seconds (1.20 G allocations: 47.704 GiB, 5.91% gc time)
+            @benchmark(uCSV.write(outpath*"df_u.csv", $df)), #528.785193 seconds (3.60 G allocations: 157.952 GiB, 8.43% gc time)
+            @benchmark(FileIO.save(outpath*"df.jld","df", $df)), #215.839709 seconds (1.16 k allocations: 6.706 GiB, 2.50% gc time)
+            @benchmark(JLD2.@save(outpath*"df.jld2", $df)), #765.809597 seconds (2.70 G allocations: 58.094 GiB, 19.22% gc time)
+            @benchmark(JuliaDB.save($dfit,outpath*randstring(8)))]
+    end
 end
 
-function rwrite(outpath)
+function rreadwrite(outpath)
     r = R"""
     memory.limit(2^31-1)
     library(fst)
     library(feather)
     library(data.table)
     df = feather::read_feather(file.path($outpath,"df.feather"))
+
+    pt = proc.time()
+    system.time(write_fst(df,file.path($outpath,"df_default.fst")))[3]
+    fstt = proc.time() - pt
+
+    #system.time(write_fst(df,file.path($outpath,"df_0.fst"), 0))[3]
+    #system.time(write_fst(df,file.path($outpath,"df_100.fst"), 100))[3]
+
+    pt = proc.time()
+    system.time(read_fst(file.path($outpath,"df_default.fst")))[3]
+    fsttr= proc.time() - pt
+
+    # system.time(read_fst(file.path($outpath,"df_0.fst")))[3],
+    # system.time(read_fst(file.path($outpath,"df_100.fst")))[3],
+
+    # multi threaded read write
+    pt = proc.time()
+    fwrite(df, file.path($outpath, "df_fwrite.csv"))
+    fwritet = proc.time() - pt
+
+    pt = proc.time()
+    system.time(fread("df_fwrite.csv"))[3]
+    dtr = proc.time() - pt
+
     list(
-        system.time(write_fst(df,file.path($outpath,"df_default.fst")))[3],
-        system.time(write_fst(df,file.path($outpath,"df_0.fst"), 0))[3],
-        system.time(write_fst(df,file.path($outpath,"df_1000.fst"), 100))[3],
-        system.time(fwrite(df, "df_fwrite.csv"))[3]
+        fstt[3],
+        fsttr[3],
+        fwritet[3],
+        dtr[3]
     )
     """
     [Float64(r[i]) for i=1:length(r)]
 end
 
-using RCall
+function plot_bench_df_read_write(julres, rres, N, exclslow=true)
+    if exclslow
+        x = ["Feather.jl",          "TextParse.jl\n FileIO.jl",         "JLD.jl\n FileIO.jl"]
+        rx = ["R\n fst (default)","R\n data.table"]
 
+        x = vcat(repeat(x, outer=2), repeat(rx, outer=2))
+        rw = ["write","read"]
 
-using Plots
-function plot_bench_df_write(res, N)
-    bar(
-        ["Feather.jl","CSV.jl","TextParse.jl\n FileIO.jl","uCSV.jl","JLD.jl\n FileIO.jl","JLD2.jl","IndexedTables.jl", "R\n fst (default)","R\n fwrite"],
-        [(x->(x.times ./ 1e9) |> mean).(res[1:7])..., res[8], res[11]]
-        , title = "DataFrame write to disk performance ($(Int(N/1_000_000))m)"
+        group = vcat(repeat(rw, inner=3), repeat(rw, inner=2))
+        
+        julwrite = (x->(x.times ./ 1e9) |> mean).(julres[1])
+        julread = (x->(x.times ./ 1e9) |> mean).(julres[2])
+        y = vcat(julwrite, julread, rres)
+
+        groupedbar(
+        x
+        , y
+        , group = group
+        , bar_position = :dodge
+        , title = "DataFrame read/write to disk performance ($(Int(N/1_000_000))m)"
         , ylabel = "seconds")
-    savefig("write_df_bench $(Int(N/1_000_000))m.png")
+        savefig("read_write_df_bench $(Int(N/1_000_000))m.png")
+    else
+        x = ["Feather.jl","CSV.jl", "TextParse.jl\n FileIO.jl","uCSV.jl","JLD.jl\n FileIO.jl","JLD2.jl","IndexedTables.jl", "R\n fst (default)","R\n fwrite"]
+        y = [(x->(x.times ./ 1e9) |> mean).(res[1:7])]
+        groupedbar(
+            x
+            , y
+            , group = group
+            , bar_position = :dodge
+            , title = "DataFrame write to disk performance ($(Int(N/1_000_000))m)"
+            , ylabel = "seconds")
+        savefig("read_write_df_bench $(Int(N/1_000_000))m.png")
+    end
 end
 
-
-res1m = bench_df_write(1_000_000, 100, outpath)
-res1m = vcat(res1m, rwrite(outpath))
+################################################################################
+# benchmark write
+# ZJ: from my own testing testing writing of 1m rows is sufficient to assess the
+# relativities
+################################################################################
+julres = bench_df_write_read(1_000_000, 100, outpath)
+rres=rreadwrite(outpath)
+res1m = (julres, rres)
 FileIO.save("df_write_bench_1m.jld", "res1m", res1m)
-plot_bench_df_write(res1m, 1_000_000)
+# a = FileIO.load("df_write_bench_1m.jld")
+# res1m = a["res1m"]
+plot_bench_df_read_write(julres, rres, 1_000_000)
 
-res100m = bench_df_write(100_000_000, 100, outpath)
-res100m = vcat(res100m, rwrite(outpath))
-FileIO.save("df_write_bench_100m.jld", "res100m", res100m)
-plot_bench_df_write(res100m, 100_000_000)
+# res100m = bench_df_write(100_000_000, 100, outpath)
+# res100m = vcat(res100m, rwrite(outpath))
+# FileIO.save("df_write_bench_100m.jld", "res100m", res100m)
+# plot_bench_df_write(res100m, 100_000_000)
 
-res10m = bench_df_write(10_000_000, 100, outpath)
-res10m = vcat(res10m, rwrite(outpath))
-FileIO.save("df_write_bench_10m.jld", "res10m", res10m)
-plot_bench_df_write(res10m, 10_000_000)
+# res1000m = bench_df_write(1_000_000_000, 100, outpath)
+# res1000m = vcat(res1000m, rwrite(outpath))
+# FileIO.save("df_write_bench_1000m.jld", "res1000m", res1000m)
+# plot_bench_df_write(res1000m, 1_000_000_000)
+
+# res10m = bench_df_write(10_000_000, 100, outpath)
+# res10m = vcat(res10m, rwrite(outpath))
+# FileIO.save("df_write_bench_10m.jld", "res10m", res10m)
+# plot_bench_df_write(res10m, 10_000_000)
+
+################################################################################
+# benchmark reads
+################################################################################
 
 
-
+################################################################################
+# run once writes
+################################################################################
 @time Feather.write("df.feather",df[1,:]);
 @time Feather.write("df.feather",df); # 138
 @time CSV.write("df.csv",df[1,:]);
