@@ -3,14 +3,14 @@
 ################################################################################
 using Revise
 using DataBench, FastGroupBy, ShortStrings, CategoricalArrays, uCSV,
-    SortingAlgorithms, Feather, BenchmarkTools, CSV, TextParse, FileIO, 
+    SortingAlgorithms, Feather, BenchmarkTools, CSV, TextParse, FileIO,
     IterableTables, JuliaDB, IndexedTables, Feather, DataFrames
 
 srand(1);
 const N = 100_000_000; const K = 100
 
 df = DataFrame()
-if isfile("df$(N÷1_000_000)m.feather") 
+if isfile("df$(N÷1_000_000)m.feather")
     @time df = Feather.read("df$(N÷1_000_000)m.feather")
 else
     @time df = createSynDataFrame(N, K); #31 #40
@@ -98,8 +98,8 @@ using Base.Threads
 df[:id6] = Int32.( df[:id6])
 
 
-@time a = fastby(sum, df[:id4], (df[:v1], df[:v2], df[:v3]));
-@time a = fastby(sum, df[:id6], (df[:v1], df[:v2], df[:v3]));
+@time a = FastGroupBy.fastby(sum, df[:id4], (df[:v1], df[:v2], df[:v3]));
+@time a = FastGroupBy.fastby(sum, df[:id6], (df[:v1], df[:v2], df[:v3]));
 
 
 function fastby2(fn::Function, byvec::AbstractVector{T}, valvec::NTuple{3, AbstractVector}) where T <: BaseRadixSortSafeTypes
@@ -125,6 +125,9 @@ if false
     @time sort(byvec)
 
     valvec = (df[:v1], df[:v2], df[:v3])
+
+
+    byvec = df[:id4]
 end
 
 ################################################################################
@@ -210,3 +213,59 @@ sort(x[1:1])
 
 using Parquet
 
+
+
+using Distributions, Optim
+
+# hard coded data\observations
+odr=[0.10,0.20,0.15,0.22,0.15,0.10,0.08,0.09,0.12]
+Q_t = quantile.(Normal(0,1), odr)
+
+# return a function that accepts `[mu, sigma]` as parameter
+function neglik_tn(Q_t)
+    maxx = maximum(Q_t)
+    f(μσ) = -sum(logpdf.(Truncated(Normal(μσ[1],μσ[2]), -Inf, maxx), Q_t))
+    f
+end
+
+neglikfn = neglik_tn(Q_t)
+
+# optimize!
+# start searching
+@time res = optimize(neglikfn, [mean(Q_t), std(Q_t)]) # 17 seconds
+@time res = optimize(neglikfn, [mean(Q_t), std(Q_t)]) # 0.000137 seconds
+
+# use `fieldnames(res)` to see the list of field names that can be referenced via . (dot)
+# the \mu and \sigma estimates
+res.minimizer # [-1.0733250637041452,0.2537450497038758]# 0.00000 seconds
+
+neglikfn = neglik_tn(Q_t.*2)
+
+
+Results of Optimization Algorithm
+ * Algorithm: Nelder-Mead
+ * Starting Point: [-1.1300664159893685,0.22269345618402703]
+ * Minimizer: [-1.0733250637041452,0.2537450497038758]
+ * Minimum: -1.893080e+00
+ * Iterations: 28
+ * Convergence: true
+   *  √(Σ(yᵢ-ȳ)²)/n < 1.0e-08: true
+   * Reached Maximum Number of Iterations: false
+ * Objective Calls: 59
+
+using Plots
+@manipulate for μ in 0:0.1:1, σ in 0:0.1:1
+    x = rand(10)
+    plot(x, x.*μ)
+end
+
+Results of Optimization Algorithm
+ * Algorithm: Nelder-Mead
+ * Starting Point: [-1.1300664159893685,0.22269345618402703]
+ * Minimizer: [-1.4295521090506047,0.3555910189025838]
+ * Minimum: -3.020876e+00
+ * Iterations: 30
+ * Convergence: true
+   *  √(Σ(yᵢ-ȳ)²)/n < 1.0e-08: true
+   * Reached Maximum Number of Iterations: false
+ * Objective Calls: 63

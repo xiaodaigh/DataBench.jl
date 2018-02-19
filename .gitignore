@@ -28,3 +28,5 @@ deps/deps.jl
 *.fst
 
 *.df
+
+*.juliadb
