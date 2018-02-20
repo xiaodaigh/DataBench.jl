@@ -16,23 +16,28 @@ function bench_df_write_read(N,K, outpath, exclslow = true)
     # frm[:to_parquet]("d:/tmp/p.feather")
 
     if exclslow
+        # dfit = table(df)
         writeres = [
-            @benchmark(Feather.write(outpath*"df.feather", $df)), # 138
-            # @benchmark(CSV.write(outpath*"df.csv", $df)), #569.749011
+            @benchmark(Feather.write(outpath*"df.feather", $df)) , # 138
+            @benchmark(CSV.write(outpath*"df.csv", $df)), #569.749011
             @benchmark(FileIO.save(outpath*"df_fileio.csv", $df)), # 209.438193 seconds (1.20 G allocations: 47.704 GiB, 5.91% gc time)
             # @benchmark(uCSV.write(outpath*"df_u.csv", $df)), #528.785193 seconds (3.60 G allocations: 157.952 GiB, 8.43% gc time)
             @benchmark(FileIO.save(outpath*"df.jld","df", $df)), #215.839709 seconds (1.16 k allocations: 6.706 GiB, 2.50% gc time)
-            # @benchmark(JLD2.@save(outpath*"df.jld2", $df)), #765.809597 seconds (2.70 G allocations: 58.094 GiB, 19.22% gc time)
-            #,@benchmark(JuliaDB.save($dfit,outpath*randstring(8)))
+            @benchmark(JLD2.@save(outpath*"df.jld2", $df)), #765.809597 seconds (2.70 G allocations: 58.094 GiB, 19.22% gc time)
+            # @benchmark(JuliaDB.save($dfit,outpath*randstring(8))),
+            # @benchmark(JuliaDB.save($dfit,"df.juliadb")),
             @benchmark($frm[:to_csv](joinpath(outpath,"df_pandas.csv")))  # pandas writing
-            # ,@benchmark($frm[:to_feather](joinpath(outpath,"df_pandas.feather")))
             ]
+
+        jldpath = outpath*"df.jld2"
         readres = [
             @benchmark(Feather.read(outpath*"df.feather"))
+            ,@benchmark(CSV.read(outpath*"df.csv"))
             ,@benchmark(DataFrame(FileIO.load(outpath*"df_fileio.csv")))
+            # ,@benchmark(uCSV.read(outpath*"df_u.csv"))
             ,@benchmark(FileIO.load(outpath*"df.jld"))
+            ,@benchmark(JLD2.@load("d:/tmp/df.jld2"))
             ,@benchmark(pd.read_csv(outpath*"df_pandas.csv"))
-            # ,@benchmark(pd.read_feather(outpath*"df_pandas.feather"))
         ]
         return (writeres, readres)
     else
@@ -70,6 +75,8 @@ function rreadwrite(outpath)
     library(fst)
     library(feather)
     library(data.table)
+    library(sparklyr)
+    library(dplyr)
 
     pt = proc.time()
     df <- feather::read_feather(file.path($outpath,"df.feather"))
@@ -103,6 +110,20 @@ function rreadwrite(outpath)
     system.time(fread(file.path($outpath, "df_fwrite.csv")))[3]
     freadr = proc.time() - pt
 
+    # r_parquet_w = proc.time()
+    # spark_write_parquet(df_tbl,"d:/tmp/df_parquet", mode = "overwrite")
+    # r_parquet_w = proc.time() - r_parquet_w
+
+    
+    # sc <- spark_connect(master = "local")
+    # dplyr:::db_drop_table(sc,"df1")
+    # dplyr:::db_drop_table(sc,"df3")
+
+    # df_tbl = copy_to(sc, df, "df1")
+    # r_parquet_r = proc.time()
+    # df = sparklyr::spark_read_parquet(sc, "df3", "d:/tmp/df_parquet")
+    # r_parquet_r = proc.time() - r_parquet_r
+
     list(
         fstw[3],
         fstr[3],
@@ -110,6 +131,8 @@ function rreadwrite(outpath)
         freadr[3],
         featherw[3],
         featherr[3]
+        # ,r_parquet_w[3]
+        # ,r_parquet_r[3]
     )
     """
     [Float64(r[i]) for i=1:length(r)]
@@ -117,17 +140,19 @@ end
 
 function plot_bench_df_read_write(julres, rres, N, exclslow=true)
     if exclslow
-        x = ["Feather.jl",          "TextParse.jl\n FileIO.jl",         "JLD.jl\n FileIO.jl", "Python\n Pandas"]
-        rx = ["R\n fst (default)","R\n data.table", "R\n feather"]
+        x = ["Feather.jl","CSV.jl", "TextParse.jl\n FileIO.jl","JLD.jl\n FileIO.jl","JLD2.jl", "Python\n Pandas"]
+        lx = length(x)
+        rx = ["R\n fst (default)","R\n data.table", "R\n feather", "R parquet\n (snappy)"]
 
         x = vcat(repeat(x, outer=2), repeat(rx, inner=2))
         rw = ["write","read"]
 
-        group = vcat(repeat(rw, inner=4), repeat(rw, outer=3))
+        group = vcat(repeat(rw, inner=lx), repeat(rw, outer=length(rx)))
 
-        julwrite = (x->(x.times ./ 1e9) |> mean).(julres[1])
-        julread = (x->(x.times ./ 1e9) |> mean).(julres[2])
+        julwrite = [mean(a.times)/1e9 for a in julres[1]]
+        julread = [mean(a.times)/1e9 for a in julres[2]]
         y = vcat(julwrite, julread, rres)
+
 
         groupedbar(
         x

@@ -1,7 +1,8 @@
 ################################################################################
 # setup
 ################################################################################
-using Revise, RCall, Plots, StatPlots
+# using Revise
+using RCall, Plots, StatPlots
 # using DataBenchs
 using uCSV, Feather, BenchmarkTools, CSV
 using TextParse, FileIO, JLD, IterableTables
@@ -28,7 +29,10 @@ nums = round.(rand(100).*100, 4);
 using PyCall
 using Conda
 #Conda.add("pandas") # need to run if runs into error
+# Conda.add_channel("conda-forge")
+# Conda.add("feather-format","conda-forge")
 @pyimport pandas as pd
+# @pyimport feather
 
 include("benchmark/bench_read_write_df_1_code.jl")
 
@@ -39,7 +43,7 @@ include("benchmark/bench_read_write_df_1_code.jl")
 ################################################################################
 println("starting testing")
 if true
-    julres = bench_df_write_read(1_000_000, 100, outpath, false )
+    julres = bench_df_write_read(1_000_000, 100, outpath, true )
     rres=rreadwrite(outpath)
     res1m = (julres, rres)
     FileIO.save(outpath*"df_write_bench_1m.jld", "res1m", res1m)
@@ -48,7 +52,18 @@ if true
     data = FileIO.load(outpath*"/df_write_bench_1m.jld")
     res1m = data["res1m"]
     (julres, rres) = res1m
-    plot_bench_df_read_write(julres, rres, 1_000_000, false)
+    plot_bench_df_read_write(julres, rres, 1_000_000, true)
+    Plots.savefig("benchmark/results/1m.png")
+
+
+    wtimes = vcat([mean(a.times)/1e9 for a in julres[1]], rres[1:2:5])
+    rtimes = vcat([mean(a.times)/1e9 for a in julres[2]], rres[2:2:6])
+
+    df = DataFrame(pkg = ["Feather.jl","CSV.jl","TextParse.jl","JLD.jl","JLD2.jl", "Pandas","fst","data.table","R feather"],
+    wtimes = wtimes,
+    rtimes = rtimes)
+
+    sort!(df, cols = [:rtimes])
 
     julres = bench_df_write_read(10_000_000, 100, outpath )
     rres=rreadwrite(outpath)
@@ -62,12 +77,7 @@ if true
     plot_bench_df_read_write(julres, rres, 10_000_000)
     Plots.savefig("benchmark/results/10m.png")
 
-    wtimes = vcat([mean(a.times)/1e9 for a in julres[1]], rres[1:2:5])
-    rtimes = vcat([mean(a.times)/1e9 for a in julres[2]], rres[2:2:6])
-
-    df = DataFrame(pkg = ["Feather.jl","TextParse.jl","JLD.jl","Pandas","fst","data.table","R feather"],
-    wtimes = wtimes,
-    rtimes = rtimes)
+   
     
 
 
