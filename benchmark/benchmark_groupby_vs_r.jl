@@ -2,24 +2,25 @@
 # setup
 ################################################################################
 using Revise
-using DataBench, FastGroupBy, ShortStrings, CategoricalArrays, uCSV,
-    SortingAlgorithms, Feather, BenchmarkTools, CSV, TextParse, FileIO,
-    IterableTables, JuliaDB, IndexedTables, Feather, DataFrames
+using DataBench, FastGroupBy, ShortStrings, CategoricalArrays, SortingLab,
+    SortingAlgorithms, Feather, BenchmarkTools, DataFrames
 
 srand(1);
 const N = 100_000_000; const K = 100
 
-df = DataFrame()
-if isfile("df$(N÷1_000_000)m.feather")
-    @time df = Feather.read("df$(N÷1_000_000)m.feather")
-else
-    @time df = createSynDataFrame(N, K); #31 #40
-    @time Feather.write("df$(N÷1_000_000)m.feather", df) # save for future use
-end
+@time df = createSynDataFrame(N, K); #31 #40
+# if isfile("df$(N÷1_000_000)m.feather")
+#     @time df = Feather.read("df$(N÷1_000_000)m.feather")
+# else
+#     @time df = createSynDataFrame(N, K); #31 #40
+#     @time Feather.write("df$(N÷1_000_000)m.feather", df) # save for future use
+# end
+# ZJ: It's actually slower to load from feather
 
 ################################################################################
 # DT[, sum(v1), keyby=id1]
 # short string & string
+# Status: SLOWER but if converted to Categorical then it's faster
 ################################################################################
 # test String15
 @time df[:id1_ss] = ShortString7.(df[:id1]);
@@ -30,51 +31,111 @@ end
 ################################################################################
 # DT[, sum(v1), keyby=id1]
 # test categorical
+# Status: FASTER 9x
 ################################################################################
 @time df[:id1_cate] = categorical(df[:id1]); #7
 @time df[:id1_cate] = compress(df[:id1_cate]); # 0.5
-@time sumby(df[:id1_cate], df[:v1]);
-@time fastby(sum, df[:id1_cate], df[:v1]);
+# @time sumby(df[:id1_cate], df[:v1]);
+# @time fastby(sum, df[:id1_cate], df[:v1]);
+@time fgroupreduce(+, df[:id1_cate], df[:v1]);
 @time fgroupreduce(+, df[:id1_cate], df[:v1]);
 
 
 ################################################################################
 # DT[, sum(v1), keyby="id1,id2"]
 # test categorical
+# Status: FASTER 9x
 ################################################################################
 @time df[:id2_cate] = categorical(df[:id2]); #7
 @time df[:id2_cate] = compress(df[:id2_cate]); # 0.5
+@time fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1]);
 @time fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1]);
 
 ################################################################################
 # DT[, list(sum(v1),mean(v3)), keyby=id3]
 # test categorical
+# Status: SLOWER
+# TODO: make a fast fsortandperm for integers
+# TODO: make this faster than data.table
+# TODO: look for mean and make it into a reduce
+# TO BEAT: 0.6s for 10m; 14.11s for 100m;
+#
+# NOTES:
+# The key issue here is that we need to sort two vectors in order to perform the
+# groupby operation. R's seems to have a really fast way to doing that 
+# Potential make the group into radix sort instead of counting sort
+#
+# What about making an RLE vector type?
+#
+# I can radixsort the 10m refs in 0.08 seconds so still 0.52 seconds to distribute
+# 
+# I can sortperm the 10m refs in 0.28 seconds so still 
 ################################################################################
 @time df[:id3_cate] = categorical(df[:id3]) |> compress;
 # @time fastby(sum, df[:id3_cate], df[:v1]);
 # @time fastby(sum, df[:id3_cate], df[:v1]);
 @time a = fastby([sum, mean], df[:id3_cate], (df[:v1], df[:v3]));
-
-# using RCall
-
-# R"""
-# memory.limit(2^31-1)
-# library(data.table)
-# df = feather::read_feather("df100m.feather")
-# setDT(df)
-# names(df)
-# # system.time(df[, list(sum(v1),mean(v3)), keyby=id3])
-# """
-
-# R"""
-# names(df)
-# """
-
+@time a = fastby([sum, mean], df[:id3_cate], (df[:v1], df[:v3]));
+@benchmark fastby([sum, mean], $df[:id3_cate], ($df[:v1], $df[:v3])) samples=5 evals=1 seconds=600
 
 if false
     import FastGroupBy: fastby
-    byvec =  df[:id3_cate]
-    refs = byvec.refs
+    byvec1 =  df[:id3_cate]
+    refs = byvec1.refs
+    byvec = copy(byvec1.refs)
+    x = collect(1:length(byvec))
+    
+    @time orderx = [b.first for b in ab]
+
+    @time val = df[:v1];
+    @time valv = @view(val[orderx]);
+    @time val2 = df[:v3];
+    @time val2v = @view(val2[orderx]);
+
+    valvec = (df[:v1], df[:v3])
+    fn = [sum, mean]
+
+    @time sortperm(refs); # 0.289167 seconds (8 allocations: 77.057 MiB, 7.54% gc time)
+    @time SortingLab.fsortperm(refs); # 0.267444 seconds (20 allocations: 228.906 MiB, 8.29% gc time)
+    @benchmark ab = SortingLab.fsortandperm_int_range_lsd(refs, N÷K, 1)
+    # 10m
+    # BenchmarkTools.Trial:
+    # memory estimate:  152.64 MiB
+    # allocs estimate:  11
+    # --------------
+    # minimum time:     183.423 ms (0.00% GC)
+    # median time:      196.381 ms (0.00% GC)
+    # mean time:        199.993 ms (0.00% GC)
+    # maximum time:     244.906 ms (0.00% GC)
+    # --------------
+    # samples:          26
+    # evals/sample:     1
+
+    # 100m
+    # BenchmarkTools.Trial:
+    # memory estimate:  1.49 GiB
+    # allocs estimate:  12
+    # --------------
+    # minimum time:     2.187 s (0.05% GC)
+    # median time:      2.377 s (6.52% GC)
+    # mean time:        2.455 s (10.56% GC)
+    # maximum time:     2.801 s (22.20% GC)
+    # --------------
+    # samples:          3
+    # evals/sample:     1
+
+    
+
+    if false
+        @time res = fastby([sum, mean], byvec, (val, val2)) # 13.65
+        @time res = fastby([sum, mean], byvec, (val, val2)) # 11.11
+    end
+
+    @time fastby([sum, mean], byvec, (val, val2))
+
+
+
+
     s = SortingLab.fsortperm(byvec.refs)
 
     val = df[s,:v1]
@@ -87,15 +148,22 @@ if false
     fn = sum
 end
 
-using JLD
-JLD.save("df100m.jld","df", df) #ERROR: StackOverflowError:
-
 ################################################################################
 # DT[, lapply(.SD, mean), keyby=id4, .SDcols=7:9]
 ################################################################################
 import FastGroupBy: BaseRadixSortSafeTypes, fastby
 using Base.Threads
 df[:id6] = Int32.( df[:id6])
+df[:id4_cate] = categorical(df[:id4]) |> compress
+
+
+@time a = FastGroupBy.fgroupreduce(+, df[:id4], df[:v1]);
+@time a = FastGroupBy.fgroupreduce(+, df[:id4], df[:v2]);
+@time a = FastGroupBy.fgroupreduce(+, df[:id4], df[:v3]);
+
+@time a = FastGroupBy.fgroupreduce(+, df[:id4_cate], df[:v1]);
+@time a = FastGroupBy.fgroupreduce(+, df[:id4_cate], df[:v2]);
+@time a = FastGroupBy.fgroupreduce(+, df[:id4_cate], df[:v3]);
 
 
 @time a = FastGroupBy.fastby(sum, df[:id4], (df[:v1], df[:v2], df[:v3]));
