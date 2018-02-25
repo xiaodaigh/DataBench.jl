@@ -386,6 +386,7 @@ gr(size=(760, 500))
 isquery(x) = x[1:5] == "Query"
 
 function plotresult_groupby(benchmark, dfres_all = dfres_all, addtitle="")
+    ms = maximum(dfres_all[:seconds])
     dfres1 = @where(dfres_all, :benchmark .==  benchmark )
     dfres1 = @where(dfres1, .!isquery.(:method))
     sort!(dfres1, cols = [:pkg, :func])
@@ -402,7 +403,8 @@ function plotresult_groupby(benchmark, dfres_all = dfres_all, addtitle="")
         ylabel = "seconds",
         label="",
         # labels = map(string, categorical(dfres1[:pkg]).refs),
-        title = "Bench $benchmark $addtitle \n 10m rows "
+        title = "Bench $benchmark $addtitle \n 10m rows ",
+        ylim = (0, ms)
     )
     # @df dfres1 groupedbar(
     #     :pkg,
@@ -427,9 +429,20 @@ function plotresult_groupby(benchmark, dfres_all = dfres_all, addtitle="")
 end
 
 plotresult_groupby(dfres_all[1,:benchmark], @where(dfres_all, :eltype .== "String"), "(String type)")
+savefig("groupby1a.png")
+
 plotresult_groupby(dfres_all[1,:benchmark], @where(dfres_all, (:eltype .== "CategoricalArrays.jl") .| (:pkg .== "R")), "(Categorical type)")
+savefig("groupby1b.png")
 
 plotresult_groupby(unique(dfres_all[:benchmark])[2])
+savefig("groupby2.png")
+
 plotresult_groupby(unique(dfres_all[:benchmark])[3])
+savefig("groupby3.png")
+
 plotresult_groupby(unique(dfres_all[:benchmark])[4])
+savefig("groupby4.png")
+
 plotresult_groupby(unique(dfres_all[:benchmark])[5])
+savefig("groupby5.png")
+
