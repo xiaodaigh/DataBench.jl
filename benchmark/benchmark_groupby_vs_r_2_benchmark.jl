@@ -295,6 +295,11 @@ push!(benchresults,
     ,("5 @by(:id6, sum1=sum(:v1), sum2=sum(:v2), sum3=sum(:v3))", bch2sec(sum79id6_ql), "Query.jl", "Int")
 )
 
+if false
+    df[:id6_cate] = categorical(df[:id6])
+    @time fastby((sum, sum, sum), df[:id6_cate], (df[:v1], df[:v2], df[:v3]))
+end
+
 ################################################################################
 # generate r data
 ################################################################################
@@ -404,7 +409,7 @@ function plotresult_groupby(benchmark, dfres_all = dfres_all, addtitle="")
         label="",
         # labels = map(string, categorical(dfres1[:pkg]).refs),
         title = "Bench $benchmark $addtitle \n 10m rows ",
-        ylim = (0, ms)
+        ylim = (0, 4)
     )
     # @df dfres1 groupedbar(
     #     :pkg,
@@ -445,4 +450,3 @@ savefig("groupby4.png")
 
 plotresult_groupby(unique(dfres_all[:benchmark])[5])
 savefig("groupby5.png")
-
