@@ -1,4 +1,4 @@
-function R_bench(N=2e9/8,K = 100; libpath = "")
+function R_bench(N=10_000_000, K = 100; libpath = "")
   R"""
   if ($libpath != "") {
     .libPaths($libpath)

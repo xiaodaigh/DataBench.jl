@@ -10,6 +10,10 @@ srand(1);
 const N = 10_000_000; const K = 100
 @time df = createSynDataFrame(N, K); #31 #40
 
+# bench results
+benchresults = []
+bch2sec(bchres) = mean(bchres.times)/1e9
+
 ################################################################################
 # DT[, sum(v1), keyby=id1]
 # short string & string
@@ -43,6 +47,13 @@ sumv1id1_query = @benchmark sumv1id1_query_fn(df)
 # sumv1id1_df_fn(df) = aggregate(df[[:id1,:v1]], :id1, sum)
 # sumv1id1_df = @benchmark sumv1id1_df_fn(df)
 
+push!(benchresults,
+     ("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_ss),    "FastGroupBy.jl\n fastby()", "ShortStrings.jl")
+    ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1),       "FastGroupBy.jl\n fastby()", "String")
+    ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_dfm),   "DataFramesMeta.jl", "String")
+    ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_query), "Query.jl", "String")
+)
+
 ################################################################################
 # DT[, sum(v1), keyby=id1]
 # test categorical
@@ -75,6 +86,13 @@ end
 
 umv1id1_cate_query = @benchmark umv1id1_cate_query_fn(df)
 
+push!(benchresults,
+     ("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_cate),    "FastGroupBy.jl\n fastby()", "CategoricalArrays.jl")
+    ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_cate_groupreduce),    "FastGroupBy.jl\n fgroupreduce()", "CategoricalArrays.jl")
+    ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_cate_dfm),   "DataFramesMeta.jl", "CategoricalArrays.jl")
+    ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(umv1id1_cate_query), "Query.jl", "CategoricalArrays.jl")
+)
+
 ################################################################################
 # DT[, sum(v1), keyby="id1,id2"]
 # test categorical
@@ -89,10 +107,10 @@ sumv1id1id2_groupreduce = @benchmark fgroupreduce(+, (df[:id1_cate], df[:id2_cat
 
 sumv1id1id2_dfm_fn(df) = @> begin
     df
-    @by([:id1_cate,:id2_cate],r = sum(:v1))
+    @by([:id1_cate,:id2_cate], r=sum(:v1))
 end
 
-@benchmark sumv1id1id2_dfm_fn(df)
+sumv1id1id2_dfm = @benchmark sumv1id1id2_dfm_fn(df)
 
 sumv1id1id2_query_fn(df) =  
 @from i in df begin
@@ -102,6 +120,12 @@ sumv1id1id2_query_fn(df) =
 end
 
 sumv1id1id2_query = @benchmark sumv1id1id2_query_fn(df)
+
+push!(benchresults,
+     ("2 @by([:id1_cate,:id2_cate], r=sum(:v1))", bch2sec(sumv1id1id2_groupreduce),    "FastGroupBy.jl\n fgroupreduce()", "CategoricalArrays.jl")
+    ,("2 @by([:id1_cate,:id2_cate], r=sum(:v1))", bch2sec(sumv1id1id2_dfm),   "DataFramesMeta.jl", "CategoricalArrays.jl")
+    ,("2 @by([:id1_cate,:id2_cate], r=sum(:v1))", bch2sec(sumv1id1id2_query), "Query.jl", "CategoricalArrays.jl")
+)
 
 ################################################################################
 # DT[, list(sum(v1),mean(v3)), keyby=id3]
@@ -152,10 +176,10 @@ sumv1meanv3id3_cate = @benchmark fastby((sum, mean), df[:id3_cate], (df[:v1], df
 
 sumv1meanv3id3_cate_dfm_fn(df) = @> begin
     df
-    @by([:id3], sumv1 = sum(:v1), meanv2=mean(:v2))
+    @by([:id3], sumv1=sum(:v1), meanv2=mean(:v2))
 end
 
-sumv1meanv3id3_cate_dfm = @benchmark sumv1meanv3id3_cate_dfm(df)
+sumv1meanv3id3_cate_dfm = @benchmark sumv1meanv3id3_cate_dfm_fn(df)
 # BenchmarkTools.Trial:  memory estimate:  1022.60 MiB
 #   allocs estimate:  7395590  --------------  
 #   minimum time:     7.985 s (0.00% GC)  
@@ -174,6 +198,11 @@ end
 
 sumv1meanv3id3_cate_ql = @benchmark sumv1meanv3id3_cate_ql_fn(df)
 
+push!(benchresults,
+     ("3 @by([:id1_cate,:id2_cate], r=sum(:v1))", bch2sec(sumv1meanv3id3_cate),    "FastGroupBy.jl\n fastby()", "CategoricalArrays.jl")
+    ,("3 @by([:id1_cate,:id2_cate], r=sum(:v1))", bch2sec(sumv1meanv3id3_cate_dfm),   "DataFramesMeta.jl", "CategoricalArrays.jl")
+    ,("3 @by([:id1_cate,:id2_cate], r=sum(:v1))", bch2sec(sumv1meanv3id3_cate_ql), "Query.jl", "CategoricalArrays.jl")
+)
 
 ################################################################################
 # DT[, lapply(.SD, mean), keyby=id4, .SDcols=7:9]
@@ -181,8 +210,8 @@ sumv1meanv3id3_cate_ql = @benchmark sumv1meanv3id3_cate_ql_fn(df)
 # TODO: make CountingSort
 # Status: MUCH SLOWER if the number of elements is large and saturating memory
 ################################################################################
-df[:id4_32] = Int32.(df[:id4])
-df[:id4_8] = Int8.(df[:id4])
+# df[:id4_32] = Int32.(df[:id4])
+# df[:id4_8] = Int8.(df[:id4])
 
 # @time a = fastby((mean, mean, mean), df[:id4], (df[:v1], df[:v2], df[:v3]));
 
@@ -206,7 +235,7 @@ mean79id4 = @benchmark fastby((mean, mean, mean), df[:id4], (df[:v1], df[:v2], d
 #   evals/sample:     1
 
 mean79id4_dfm_fn(df) = @> df begin
-    @by(:id4, mean1 = mean(:v1), mean2 = mean(:v2), mean3 = mean(:v3))
+    @by(:id4, mean1=mean(:v1), mean2=mean(:v2), mean3=mean(:v3))
 end
 
 mean79id4_dfm = @benchmark mean79id4_dfm_fn(df)
@@ -218,6 +247,12 @@ mean79id4_ql_fn(df) = @from i in df begin
 end
 
 mean79id4_ql = @benchmark mean79id4_ql_fn(df)
+
+push!(benchresults,
+     ("4 @by(:id4, mean1=mean(:v1), mean2=mean(:v2), mean3=mean(:v3))", bch2sec(mean79id4),    "FastGroupBy.jl\n fastby()", "Int")
+    ,("4 @by(:id4, mean1=mean(:v1), mean2=mean(:v2), mean3=mean(:v3))", bch2sec(mean79id4_dfm),   "DataFramesMeta.jl", "Int")
+    ,("4 @by(:id4, mean1=mean(:v1), mean2=mean(:v2), mean3=mean(:v3))", bch2sec(mean79id4_ql), "Query.jl", "Int")
+)
 
 ################################################################################
 # DT[, lapply(.SD, sum), keyby=id6, .SDcols=7:9]
@@ -241,7 +276,7 @@ sum79id6 = @benchmark fastby((sum, sum, sum), df[:id6], (df[:v1], df[:v2], df[:v
 #   evals/sample:     1
 
 sum79id6_dfm_fn(df) = @> df begin
-    @by(:id6, sum1 = sum(:v1), sum2 = sum(:v2), sum3 = sum(:v3))
+    @by(:id6, sum1=sum(:v1), sum2=sum(:v2), sum3=sum(:v3))
 end
 
 sum79id6_dfm = @benchmark sum79id6_dfm_fn(df)
@@ -254,13 +289,19 @@ end
 
 sum79id6_ql = @benchmark sum79id6_ql_fn(df)
 
+push!(benchresults,
+     ("5 @by(:id6, sum1=sum(:v1), sum2=sum(:v2), sum3=sum(:v3))", bch2sec(sum79id6),    "FastGroupBy.jl\n fastby()", "Int")
+    ,("5 @by(:id6, sum1=sum(:v1), sum2=sum(:v2), sum3=sum(:v3))", bch2sec(sum79id6_dfm),   "DataFramesMeta.jl", "Int")
+    ,("5 @by(:id6, sum1=sum(:v1), sum2=sum(:v2), sum3=sum(:v3))", bch2sec(sum79id6_ql), "Query.jl", "Int")
+)
+
 ################################################################################
 # generate r data
 ################################################################################
 using RCall
 
-R"""
-memory.llimit()
+rres=R"""
+memory.limit(2^31-1)
 library(data.table)
 N=$N; K=$K
 set.seed(1)
@@ -278,17 +319,52 @@ DT <- data.table(
 cat("GB =", round(sum(gc()[,2])/1024, 3), "\n")
 replicate(5, list(
     system.time( DT[, sum(v1), keyby=id1] ),
-    system.time( DT[, sum(v1), keyby=id1] ),
-    system.time( DT[, sum(v1), keyby="id1,id2"] ),
     system.time( DT[, sum(v1), keyby="id1,id2"] ),
     system.time( DT[, list(sum(v1),mean(v3)), keyby=id3] ),
-    system.time( DT[, list(sum(v1),mean(v3)), keyby=id3] ),
     system.time( DT[, lapply(.SD, mean), keyby=id4, .SDcols=7:9] ),
-    system.time( DT[, lapply(.SD, mean), keyby=id4, .SDcols=7:9] ),
-    system.time( DT[, lapply(.SD, sum), keyby=id6, .SDcols=7:9] ),
     system.time( DT[, lapply(.SD, sum), keyby=id6, .SDcols=7:9] )
 ))
 """
+
+rres1 = [mean(x->x[3], getindex.(rres,j,1:5)) for j=1:5]
+
+################################################################################
+# Combine Julia Data with R Data
+################################################################################
+dfres = DataFrame()
+for (i, n) in enumerate([:benchmark,:seconds,:method,:eltype])
+    dfres[n] = [j[i] for j in benchresults]
+end
+dfres
+
+# prepare the R results
+dfres_r = DataFrame(
+    benchmark = unique(dfres[:benchmark]) |> sort,
+    seconds = rres1,
+    method = ["R\n data.table" for i=1:5],
+    eltype = ["String", "String", "String", "Int", "Int"]
+)
+
+dfres_all = vcat(dfres, dfres_r)
+
+function getstr(str)
+    ss = split.(str,"\n")
+    n = length(ss)
+    if n == 2
+        return ss[1], "", ss[2]
+    elseif n == 1
+        return ss[1], "", ""
+    else
+        return ss[1], ss[2], ss[3]
+    end
+end
+
+getstrres = getstr.(dfres_all[:method])
+
+dfres_all[:pkg] = [getstrres1[1] for getstrres1 in getstrres]
+dfres_all[:func] = [getstrres1[3] for getstrres1 in getstrres]
+
+dfres_all[:label] = lstrip.(((func, pkg)->ifelse(func=="",pkg, func)).(dfres_all[:func], dfres_all[:pkg]))
 
 ################################################################################
 # Convert to IndexedTables.jl
@@ -303,3 +379,57 @@ using IndexedTables, JuliaDB
 ################################################################################
 # plotting of results
 ################################################################################
+using Plots
+gr(size=(760, 500))
+# gr()
+
+isquery(x) = x[1:5] == "Query"
+
+function plotresult_groupby(benchmark, dfres_all = dfres_all, addtitle="")
+    dfres1 = @where(dfres_all, :benchmark .==  benchmark )
+    dfres1 = @where(dfres1, .!isquery.(:method))
+    sort!(dfres1, cols = [:pkg, :func])
+
+    bar(
+        dfres1[:pkg].*"\n".*dfres1[:func].*" ".*dfres1[:eltype],
+        # log.(dfres1[:seconds]),
+        (dfres1[:seconds]),
+        # orientation = :h,
+        # horizontal = true,
+        # group = dfres1[:pkg],
+        fillcolor = categorical(dfres1[:pkg]).refs,
+        # bar_position = :dodge,
+        ylabel = "seconds",
+        label="",
+        # labels = map(string, categorical(dfres1[:pkg]).refs),
+        title = "Bench $benchmark $addtitle \n 10m rows "
+    )
+    # @df dfres1 groupedbar(
+    #     :pkg,
+    #     :seconds,
+    #     # orientation = :h,
+    #     # horizontal = true,
+    #    orientation = :horizontal,
+    #     group = :label,
+    #     bar_position = :dodge,
+    #     xlabel = "seconds",
+    #     title = "Bench $benchmark\n 10m rows"
+    # )
+
+    # barplot(
+    #     x = dfres1[:method] .* "\n" .* dfres1[:eltype],
+    #     y = dfres1[:seconds],
+    #     horizontal = true,
+    #     group=collect(1:length(dfres1[:seconds]))#,
+    #     # label = "seconds",
+    #     # title = "Bench $benchmark\n 10m rows"
+    # )
+end
+
+plotresult_groupby(dfres_all[1,:benchmark], @where(dfres_all, :eltype .== "String"), "(String type)")
+plotresult_groupby(dfres_all[1,:benchmark], @where(dfres_all, (:eltype .== "CategoricalArrays.jl") .| (:pkg .== "R")), "(Categorical type)")
+
+plotresult_groupby(unique(dfres_all[:benchmark])[2])
+plotresult_groupby(unique(dfres_all[:benchmark])[3])
+plotresult_groupby(unique(dfres_all[:benchmark])[4])
+plotresult_groupby(unique(dfres_all[:benchmark])[5])

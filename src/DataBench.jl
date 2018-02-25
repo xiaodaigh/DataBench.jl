@@ -10,7 +10,8 @@ export createSynDataFrame
 
 include("julia/indexedtable.jl_bench.jl")
 include("julia/rbench.jl")
-include("julia/DataFrames.jl")
+include("julia/r_data_table_group_by/DataFrames.jl")
+include("julia/r_data_table_group_by/DataFrames.jl")
 
 
 end # module
