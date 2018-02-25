@@ -28,9 +28,9 @@ nums = round.(rand(100).*100, 4);
 ############################ python package test
 using PyCall
 using Conda
-#Conda.add("pandas") # need to run if runs into error
+# Conda.add("pandas") # need to run if runs into error
 # Conda.add_channel("conda-forge")
-# Conda.add("feather-format","conda-forge")
+# Conda.add("feather-format")
 @pyimport pandas as pd
 # @pyimport feather
 

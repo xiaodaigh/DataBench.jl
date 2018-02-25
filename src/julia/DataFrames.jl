@@ -11,7 +11,7 @@ function createSynDataFrame(N::Int,K::Int)
         id3 = rand(pool1,N),
         id4 = rand(1:K,N),
         id5 = rand(1:K,N),
-        id6 = rand(1:(N/K),N),
+        id6 = rand(1:(N÷K),N),
         v1 = rand(1:5,N),
         v2 = rand(1:5,N),
         v3 = rand(nums,N))
@@ -30,7 +30,7 @@ function createSynDataFrame_categoricalarray(N::Int,K::Int)
         id3 = rand(pool1,N),
         id4 = rand(1:K,N),
         id5 = rand(1:K,N),
-        id6 = rand(1:(N/K),N),
+        id6 = rand(1:(N÷K),N),
         v1 = rand(1:5,N),
         v2 = rand(1:5,N),
         v3 = rand(nums, N))

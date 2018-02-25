@@ -10,7 +10,6 @@ export createSynDataFrame
 
 include("julia/indexedtable.jl_bench.jl")
 include("julia/rbench.jl")
-include("julia/gen_string.jl")
 include("julia/DataFrames.jl")
 
 

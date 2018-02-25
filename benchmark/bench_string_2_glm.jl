@@ -1,3 +1,5 @@
+# in this I try to fit a model
+
 using CSV, DataFrames, DataFramesMeta
 respath = "benchmark/bench_string_results/"
 paths = readdir(respath)

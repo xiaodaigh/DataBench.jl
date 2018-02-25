@@ -1,7 +1,5 @@
 using StatsBase, RCall, Query, DataFrames, DataFramesMeta, Distributions, PooledArrays, DataTables, IndexedTables
 
-
-
 function createDataTable(N::Int,K::Int)
   pool = [@sprintf "id%03d" k for k in 1:K]
   pool1 = [@sprintf "id%010d" k for k in 1:(N/K)]
