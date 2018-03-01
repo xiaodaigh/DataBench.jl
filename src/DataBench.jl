@@ -11,7 +11,6 @@ export createSynDataFrame
 include("julia/blogpost/indexedtable.jl_bench.jl")
 include("julia/r_data_table_group_by/rbench.jl")
 include("julia/r_data_table_group_by/DataFrames.jl")
-include("julia/r_data_table_group_by/DataFrames.jl")
 
 
 end # module

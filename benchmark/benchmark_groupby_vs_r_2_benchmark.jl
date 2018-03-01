@@ -103,7 +103,13 @@ push!(benchresults,
 # @time fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1]);
 # @time fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1]);
 
+fn, byveccv, val = +, (df[:id1_cate], df[:id2_cate]), df[:v1]
+
+@time a = fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1])
+
 sumv1id1id2_groupreduce = @benchmark fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1])
+
+@code_warntype fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1])
 
 sumv1id1id2_dfm_fn(df) = @> begin
     df
@@ -297,7 +303,18 @@ push!(benchresults,
 
 if false
     df[:id6_cate] = categorical(df[:id6])
-    @time fastby((sum, sum, sum), df[:id6_cate], (df[:v1], df[:v2], df[:v3]))
+    @benchmark fgroupreduce.((+,), (df[:id6_cate],), (df[:v1], df[:v2], df[:v3]))
+    # BenchmarkTools.Trial:  
+    # memory estimate:  123.80 MiB  
+    # allocs estimate:  600971  
+    # --------------  
+    # minimum time:     347.807 ms (0.00% GC)  
+    # median time:      364.181 ms (0.00% GC)  
+    # mean time:        363.018 ms (0.00% GC)  
+    # maximum time:     385.564 ms (0.00% GC)  
+    # --------------  
+    # samples:          14
+    # evals/sample:     1
 end
 
 ################################################################################
