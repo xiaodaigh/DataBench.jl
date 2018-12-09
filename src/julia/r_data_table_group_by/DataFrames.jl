@@ -1,8 +1,8 @@
 using DataFrames
 
 function createSynDataFrame(N::Int,K::Int)
-    pool = "id".*dec.(1:K,3)
-    pool1 = "id".*dec.(1:N÷K,10)
+    pool = "id".*string.(1:K, pad=3)
+    pool1 = "id".*string.(1:N÷K,pad=10)
     nums = round.(rand(100).*100, 4)
 
     df = DataFrame(
