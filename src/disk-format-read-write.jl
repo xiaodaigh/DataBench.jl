@@ -9,8 +9,9 @@ gen_benchmark(dirpath, largest_file, outpath, data_label; delim = ',', header=tr
         mkpath(outpath)
     end
 
+    println("CSV.read")
     csv_read1 = @elapsed df = CSV.read(joinpath(dirpath, largest_file), delim = delim, header = header, threaded=false);
-    csv_read2 = @elapsed      CSV.read(joinpath(dirpath, largest_file), delim = delim, header = header, threaded=false);
+    csv_read2 = @elapsed df = CSV.read(joinpath(dirpath, largest_file), delim = delim, header = header, threaded=false);
 
     csv_write1 = 0
     csv_write2 = 0
@@ -235,7 +236,7 @@ end
 
 
 # AirTime
-#@time res = gen_benchmark("c:/data/AirOnTimeCSV/", "airOT199302.csv", "c:/data/jdf-bench/airOT199302.csv", "Air On Time 199302")
+@time res = gen_benchmark("c:/data/AirOnTimeCSV/", "airOT199302.csv", "c:/data/jdf-bench/airOT199302.csv", "Air On Time 199302")
 
 
 # Fannie Mae
@@ -246,12 +247,12 @@ end
 # ;tar zxvg mortgage_2000-2007.tgz
 
 # uncomment for debugging
-# dirpath = "C:/data/perf/"
-# largest_file = "Performance_2004Q3.txt"
-# outpath = "c:/data/jdf-bench/Performance_2004Q3.txt"
-# data_label =  "Fannie Mae Performance 2004Q3"
+dirpath = "C:/data/perf/"
+largest_file = "Performance_2004Q3.txt"
+outpath = "c:/data/jdf-bench/Performance_2004Q3.txt"
+data_label =  "Fannie Mae Performance 2004Q3"
 #
-# @time res = gen_benchmark(dirpath, largest_file, outpath, data_label, delim = '|', header = false);
+@time res = gen_benchmark(dirpath, largest_file, outpath, data_label, delim = '|', header = false);
 
 
 
