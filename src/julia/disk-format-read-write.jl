@@ -2,7 +2,7 @@ using CSV, Feather
 using JDF, FileIO, Blosc, StatsPlots, RCall
 using DataFrames, WeakRefStrings # required for JLD2, JDF
 using Fread:fread
-Blosc.set_num_threads(6)
+Blosc.set_num_threads(Threads.nthreads())
 
 gen_benchmark(dirpath, largest_file, outpath, data_label; delim = ',', header=true) = begin
     if !isdir(outpath)

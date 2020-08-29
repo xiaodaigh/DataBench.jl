@@ -20,8 +20,8 @@ function randstrarray1c(pool, N)
 end
 
 function createIndexedTable(N::Int,K::Int)
-  pool = [@sprintf "id%03d" k for k in 1:K]
-  pool1 = [@sprintf "id%010d" k for k in 1:(N/K)]
+  pool = ["id"*string(k, pad = 3) for k in 1:K]
+  pool1 = ["id"*string(k, pad = 10) for k in 1:(N/K)]
 
   DT = IndexedTable(
     IndexedTables.Columns(

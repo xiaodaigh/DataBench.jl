@@ -1,3 +1,5 @@
+ # This is to benchmark
+
 function bench_df_write_read(N,K, outpath, exclslow = true)
     df = DataFrame(
         id1 = rand(pool,N),
@@ -114,7 +116,7 @@ function rreadwrite(outpath)
     # spark_write_parquet(df_tbl,"d:/tmp/df_parquet", mode = "overwrite")
     # r_parquet_w = proc.time() - r_parquet_w
 
-    
+
     # sc <- spark_connect(master = "local")
     # dplyr:::db_drop_table(sc,"df1")
     # dplyr:::db_drop_table(sc,"df3")

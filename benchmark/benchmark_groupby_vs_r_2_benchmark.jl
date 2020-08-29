@@ -1,12 +1,12 @@
 ################################################################################
 # setup
 ################################################################################
-using Revise
+# using Revise
 using DataBench, FastGroupBy, ShortStrings, CategoricalArrays, SortingLab,
-    SortingAlgorithms, Feather, BenchmarkTools, DataFrames, DataFramesMeta,
-    Lazy, Query
+    SortingAlgorithms, BenchmarkTools, DataFrames, DataFramesMeta, StatsBase
 
-srand(1);
+using Random
+Random.seed!(1);
 const N = 10_000_000; const K = 100
 @time df = createSynDataFrame(N, K); #31 #40
 
@@ -14,35 +14,53 @@ const N = 10_000_000; const K = 100
 benchresults = []
 bch2sec(bchres) = mean(bchres.times)/1e9
 
+
+using DataFrames
+using FastGroupBy
+using BenchmarkTools
+df = DataFrame(x=rand(1:10, 10^8), y = rand(1:10, 10^8));
+
+function group_by_df(df)
+    combine(DataFrames.groupby(df, :x), counts = :x=>sum)
+end
+
+@benchmark group_by_df($df)
+@benchmark by($df, :x, counts=:x=>sum)
+# @benchmark fastby(sum, $df, :x)
+# @benchmark countmap(df[!, :x])
+# @benchmark countmap(df[!, :x], alg=:dict)
+# @benchmark fgroupreduce(+, df[!, :x], df[!, :x], 0)
+
 ################################################################################
 # DT[, sum(v1), keyby=id1]
 # short string & string
 # Status: SLOWER but if converted to Categorical then it's faster
 ################################################################################
 # test String15
-@time df[:id1_ss] = ShortString7.(df[:id1]);
-# @time a = fastby(sum, df[:id1_ss], df[:v1]);
-# @time a = fastby(sum, df[:id1_ss], df[:v1]);
+@time df[!,:id1_ss] = ShortString7.(df[!,:id1]);
+# @time a = fastby(sum, df[!,:id1_ss], df[!,:v1]);
+# @time a = fastby(sum, df[!,:id1_ss], df[!,:v1]);
 
-# @time a = fastby(sum, df[:id1], df[:v1]);
-# @time a = fastby(sum, df[:id1], df[:v1]);
+# @time a = fastby(sum, df[!,:id1], df[!,:v1]);
+# @time a = fastby(sum, df[!,:id1], df[!,:v1]);
 
-sumv1id1_ss = @benchmark fastby(sum, df[:id1_ss], df[:v1])
-sumv1id1 = @benchmark fastby(sum, df[:id1], df[:v1])
+# sumv1id1_ss = @benchmark fastby(sum, df[!,:id1_ss], df[!,:v1])
+#sumv1id1 = @benchmark fastby(sum, df[!,:id1], df[!,:v1])
+sumv1id1 = @benchmark fastby(sum, $df, :id1 ,:v1)
 
-sumv1id1_dfm_fn(df) = @> begin
-    df
-    @by(:id1, sumx=sum(:v1))
-end
+sumv1id1_dfm_fn(df) = @by(df, :id1, sumx=sum(:v1))
 
-sumv1id1_dfm = @benchmark sumv1id1_dfm_fn(df)
+sumv1id1_dfm = @benchmark sumv1id1_dfm_fn($df)
 
-sumv1id1_query_fn(df) = @from i in df begin
-    @group i by i.id1 into g
-    @select {r=sum(g..v1)}
-    @collect DataFrame
-end
-sumv1id1_query = @benchmark sumv1id1_query_fn(df)
+@benchmark by($df, :id1, v1sum = :v1 => sum)
+
+
+# sumv1id1_query_fn(df) = @from i in df begin
+#     @group i by i.id1 into g
+#     @select {r=sum(g..v1)}
+#     @collect DataFrame
+# end
+# sumv1id1_query = @benchmark sumv1id1_query_fn(df)
 
 # sumv1id1_df_fn(df) = aggregate(df[[:id1,:v1]], :id1, sum)
 # sumv1id1_df = @benchmark sumv1id1_df_fn(df)
@@ -51,7 +69,7 @@ push!(benchresults,
      ("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_ss),    "FastGroupBy.jl\n fastby()", "ShortStrings.jl")
     ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1),       "FastGroupBy.jl\n fastby()", "String")
     ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_dfm),   "DataFramesMeta.jl", "String")
-    ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_query), "Query.jl", "String")
+    # ,("1 @by(:id1, sumx=sum(:v1))", bch2sec(sumv1id1_query), "Query.jl", "String")
 )
 
 ################################################################################
@@ -59,17 +77,17 @@ push!(benchresults,
 # test categorical
 # Status: FASTER 9x
 ################################################################################
-@time df[:id1_cate] = categorical(df[:id1]); #7
-@time df[:id1_cate] = compress(df[:id1_cate]); # 0.5
-# @time sumby(df[:id1_cate], df[:v1]);
-# @time fastby(sum, df[:id1_cate], df[:v1]);
-# @time fastby(sum, df[:id1_cate], df[:v1]);
+@time df[!,:id1_cate] = categorical(df[!,:id1]); #7
+@time df[!,:id1_cate] = compress(df[!,:id1_cate]); # 0.5
+# @time sumby(df[!,:id1_cate], df[!,:v1]);
+# @time fastby(sum, df[!,:id1_cate], df[!,:v1]);
+# @time fastby(sum, df[!,:id1_cate], df[!,:v1]);
 
-# @time fgroupreduce(+, df[:id1_cate], df[:v1]);
-# @time fgroupreduce(+, df[:id1_cate], df[:v1]);
+# @time fgroupreduce(+, df[!,:id1_cate], df[!,:v1]);
+# @time fgroupreduce(+, df[!,:id1_cate], df[!,:v1]);
 
-sumv1id1_cate = @benchmark fastby(sum, df[:id1_cate], df[:v1])
-sumv1id1_cate_groupreduce = @benchmark fgroupreduce(+, df[:id1_cate], df[:v1])
+sumv1id1_cate = @benchmark fastby(sum, df[!,:id1_cate], df[!,:v1])
+sumv1id1_cate_groupreduce = @benchmark fgroupreduce(+, df[!,:id1_cate], df[!,:v1])
 
 sumv1id1_cate_dfm_fn(df) = @> begin
     df
@@ -98,18 +116,18 @@ push!(benchresults,
 # test categorical
 # Status: FASTER 9x
 ################################################################################
-@time df[:id2_cate] = categorical(df[:id2]); #7
-@time df[:id2_cate] = compress(df[:id2_cate]); # 0.5
-# @time fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1]);
-# @time fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1]);
+@time df[!,:id2_cate] = categorical(df[!,:id2]); #7
+@time df[!,:id2_cate] = compress(df[!,:id2_cate]); # 0.5
+# @time fgroupreduce(+, (df[!,:id1_cate], df[!,:id2_cate]), df[!,:v1]);
+# @time fgroupreduce(+, (df[!,:id1_cate], df[!,:id2_cate]), df[!,:v1]);
 
-fn, byveccv, val = +, (df[:id1_cate], df[:id2_cate]), df[:v1]
+fn, byveccv, val = +, (df[!,:id1_cate], df[!,:id2_cate]), df[!,:v1]
 
-@time a = fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1])
+@time a = fgroupreduce(+, (df[!,:id1_cate], df[!,:id2_cate]), df[!,:v1])
 
-sumv1id1id2_groupreduce = @benchmark fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1])
+sumv1id1id2_groupreduce = @benchmark fgroupreduce(+, (df[!,:id1_cate], df[!,:id2_cate]), df[!,:v1])
 
-@code_warntype fgroupreduce(+, (df[:id1_cate], df[:id2_cate]), df[:v1])
+@code_warntype fgroupreduce(+, (df[!,:id1_cate], df[!,:id2_cate]), df[!,:v1])
 
 sumv1id1id2_dfm_fn(df) = @> begin
     df
@@ -118,7 +136,7 @@ end
 
 sumv1id1id2_dfm = @benchmark sumv1id1id2_dfm_fn(df)
 
-sumv1id1id2_query_fn(df) =  
+sumv1id1id2_query_fn(df) =
 @from i in df begin
     @group i by (i.id1,i.id2) into g
     @select {r=sum(g..v1)}
@@ -144,19 +162,19 @@ push!(benchresults,
 #
 # NOTES:
 # The key issue here is that we need to sort two vectors in order to perform the
-# groupby operation. R's seems to have a really fast way to doing that 
+# groupby operation. R's seems to have a really fast way to doing that
 # Potential make the group into radix sort instead of counting sort
 #
 # What about making an RLE vector type?
 #
 # I can radixsort the 10m refs in 0.08 seconds so still 0.52 seconds to distribute
-# 
-# I can sortperm the 10m refs in 0.28 seconds so still 
+#
+# I can sortperm the 10m refs in 0.28 seconds so still
 ################################################################################
-@time df[:id3_cate] = categorical(df[:id3]) |> compress;
+@time df[!,:id3_cate] = categorical(df[!,:id3]) |> compress;
 # import FastGroupBy: BaseRadixSortSafeTypes, fastby
 
-sumv1meanv3id3_cate = @benchmark fastby((sum, mean), df[:id3_cate], (df[:v1], df[:v3]))
+sumv1meanv3id3_cate = @benchmark fastby((sum, mean), df[!,:id3_cate], (df[!,:v1], df[!,:v3]))
 # BenchmarkTools.Trial:
 #   memory estimate:  435.87 MiB
 #   allocs estimate:  1000315
@@ -187,8 +205,8 @@ end
 
 sumv1meanv3id3_cate_dfm = @benchmark sumv1meanv3id3_cate_dfm_fn(df)
 # BenchmarkTools.Trial:  memory estimate:  1022.60 MiB
-#   allocs estimate:  7395590  --------------  
-#   minimum time:     7.985 s (0.00% GC)  
+#   allocs estimate:  7395590  --------------
+#   minimum time:     7.985 s (0.00% GC)
 #   median time:      7.985 s (0.00% GC)
 #   mean time:        7.985 s (0.00% GC)
 #   maximum time:     7.985 s (0.00% GC)
@@ -216,18 +234,18 @@ push!(benchresults,
 # TODO: make CountingSort
 # Status: MUCH SLOWER if the number of elements is large and saturating memory
 ################################################################################
-# df[:id4_32] = Int32.(df[:id4])
-# df[:id4_8] = Int8.(df[:id4])
+# df[!,:id4_32] = Int32.(df[!,:id4])
+# df[!,:id4_8] = Int8.(df[!,:id4])
 
-# @time a = fastby((mean, mean, mean), df[:id4], (df[:v1], df[:v2], df[:v3]));
+# @time a = fastby((mean, mean, mean), df[!,:id4], (df[!,:v1], df[!,:v2], df[!,:v3]));
 
-# @time a = fastby((mean, mean, mean), df[:id4_32], (df[:v1], df[:v2], df[:v3]));
-# @time a = fastby((mean, mean, mean), df[:id4_32], (df[:v1], df[:v2], df[:v3]));
+# @time a = fastby((mean, mean, mean), df[!,:id4_32], (df[!,:v1], df[!,:v2], df[!,:v3]));
+# @time a = fastby((mean, mean, mean), df[!,:id4_32], (df[!,:v1], df[!,:v2], df[!,:v3]));
 
-# @time a = fastby((mean, mean, mean), df[:id4_8], (df[:v1], df[:v2], df[:v3]));
-# @time a = fastby((mean, mean, mean), df[:id4_8], (df[:v1], df[:v2], df[:v3]));
+# @time a = fastby((mean, mean, mean), df[!,:id4_8], (df[!,:v1], df[!,:v2], df[!,:v3]));
+# @time a = fastby((mean, mean, mean), df[!,:id4_8], (df[!,:v1], df[!,:v2], df[!,:v3]));
 
-mean79id4 = @benchmark fastby((mean, mean, mean), df[:id4], (df[:v1], df[:v2], df[:v3]))
+mean79id4 = @benchmark fastby((mean, mean, mean), df[!,:id4], (df[!,:v1], df[!,:v2], df[!,:v3]))
 # BenchmarkTools.Trial:
 #   memory estimate:  540.57 MiB
 #   allocs estimate:  2470
@@ -264,11 +282,11 @@ push!(benchresults,
 # DT[, lapply(.SD, sum), keyby=id6, .SDcols=7:9]
 # TO BEAT: 0.4s for 10m; 11.33s for 100m; 31.31 for 250m
 ################################################################################
-df[:id6] = Int64.(df[:id6]); # this is needed not because it was `Int64` but `Float64`
-# @time a = fastby((sum, sum, sum), df[:id6], (df[:v1], df[:v2], df[:v3]));
-# @time a = fastby((sum, sum, sum), df[:id6], (df[:v1], df[:v2], df[:v3]));
+df[!,:id6] = Int64.(df[!,:id6]); # this is needed not because it was `Int64` but `Float64`
+# @time a = fastby((sum, sum, sum), df[!,:id6], (df[!,:v1], df[!,:v2], df[!,:v3]));
+# @time a = fastby((sum, sum, sum), df[!,:id6], (df[!,:v1], df[!,:v2], df[!,:v3]));
 
-sum79id6 = @benchmark fastby((sum, sum, sum), df[:id6], (df[:v1], df[:v2], df[:v3]))
+sum79id6 = @benchmark fastby((sum, sum, sum), df[!,:id6], (df[!,:v1], df[!,:v2], df[!,:v3]))
 # BenchmarkTools.Trial:
 #   memory estimate:  598.48 MiB
 #   allocs estimate:  1330706
@@ -302,17 +320,17 @@ push!(benchresults,
 )
 
 if false
-    df[:id6_cate] = categorical(df[:id6])
-    @benchmark fgroupreduce.((+,), (df[:id6_cate],), (df[:v1], df[:v2], df[:v3]))
-    # BenchmarkTools.Trial:  
-    # memory estimate:  123.80 MiB  
-    # allocs estimate:  600971  
-    # --------------  
-    # minimum time:     347.807 ms (0.00% GC)  
-    # median time:      364.181 ms (0.00% GC)  
-    # mean time:        363.018 ms (0.00% GC)  
-    # maximum time:     385.564 ms (0.00% GC)  
-    # --------------  
+    df[!,:id6_cate] = categorical(df[!,:id6])
+    @benchmark fgroupreduce.((+,), (df[!,:id6_cate],), (df[!,:v1], df[!,:v2], df[!,:v3]))
+    # BenchmarkTools.Trial:
+    # memory estimate:  123.80 MiB
+    # allocs estimate:  600971
+    # --------------
+    # minimum time:     347.807 ms (0.00% GC)
+    # median time:      364.181 ms (0.00% GC)
+    # mean time:        363.018 ms (0.00% GC)
+    # maximum time:     385.564 ms (0.00% GC)
+    # --------------
     # samples:          14
     # evals/sample:     1
 end

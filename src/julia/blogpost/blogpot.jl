@@ -1,3 +1,6 @@
+"""
+This section is no longer relevant as indexed table has died
+"""
 
 # only need to be run once to install packages
 #Pkg.clone("https://github.com/JuliaData/SplitApplyCombine.jl.git")

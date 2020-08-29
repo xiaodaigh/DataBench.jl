@@ -1,15 +1,16 @@
 using SortingAlgorithms
-using RCall, PyCall, DataFrames, BenchmarkTools, IterTools, CSV
+using RCall, DataFrames, BenchmarkTools, IterTools, CSV
 using Plots
-gr()
+#using PyCall
+Plots.gr()
 
 function string_sort_timing_cmp(N, K, idnumlen = 10)
     srand(1);
     svec1 = rand(["id"*dec(i,idnumlen) for i in 1:N÷K], N);
-    julia_timing = @elapsed sort(svec1, alg = StringRadixSort); 
+    julia_timing = @elapsed sort(svec1, alg = StringRadixSort);
     println(julia_timing)
 
-    julia_timing_base = @elapsed sort(svec1); 
+    julia_timing_base = @elapsed sort(svec1);
     println(julia_timing_base)
 
     R"""
@@ -26,25 +27,25 @@ function string_sort_timing_cmp(N, K, idnumlen = 10)
 
     println(r_timing[3])
 
-    py"""
-    import numpy as np
-    import timeit
+    # py"""
+    # import numpy as np
+    # import timeit
 
-    # randChar is workaround for MemoryError in mtrand.RandomState.choice
-    # http://stackoverflow.com/questions/25627161/how-to-solve-memory-error-in-mtrand-randomstate-choice
-    def randChar(f, numGrp, N) :
-        things = [f%x for x in range(numGrp)]
-        return [things[x] for x in np.random.choice(numGrp, N)]
+    # # randChar is workaround for MemoryError in mtrand.RandomState.choice
+    # # http://stackoverflow.com/questions/25627161/how-to-solve-memory-error-in-mtrand-randomstate-choice
+    # def randChar(f, numGrp, N) :
+    #     things = [f%x for x in range(numGrp)]
+    #     return [things[x] for x in np.random.choice(numGrp, N)]
 
-    id3 = randChar("id%010d", $N//$K, $N)   # small groups (char)
-    tt = timeit.Timer("id3.sort()" ,"from __main__ import id3").timeit(1) # 6.8 seconds
-    """
+    # id3 = randChar("id%010d", $N//$K, $N)   # small groups (char)
+    # tt = timeit.Timer("id3.sort()" ,"from __main__ import id3").timeit(1) # 6.8 seconds
+    # """
 
     python_timing = py"tt"
 
-    DataFrame(  lang = ["Julia", "Julia", "R", "Python"], 
+    DataFrame(  lang = ["Julia", "Julia", "R", "Python"],
                 alg  = ["radix", "base", "radix", "base"],
-                timings = [julia_timing, julia_timing_base, r_timing[3], python_timing], 
+                timings = [julia_timing, julia_timing_base, r_timing[3], python_timing],
                 N = repeat([N], inner = 4),
                 K = repeat([K], inner = 4),
                 idnumlen = repeat([idnumlen], inner = 4),
@@ -111,5 +112,5 @@ srand(1);
 N = 10_000_000
 K = 1
 svec1 = rand(["id"*dec(i,10) for i in 1:N÷K], N);
-julia_timing = @elapsed sort(svec1, alg = StringRadixSort); 
+julia_timing = @elapsed sort(svec1, alg = StringRadixSort);
 println(julia_timing)
